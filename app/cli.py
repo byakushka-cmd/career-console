@@ -76,20 +76,25 @@ def cmd_validate(args) -> None:
         sys.exit(1)
 
 
-def cmd_init(args) -> None:
-    """A new, empty database: for a start without a tracker spreadsheet to import."""
+def create_database(db_path: Path) -> int:
+    """A new, empty database with the whole schema; its schema version."""
     from app import db
-    db_path = Path(args.db) if args.db else paths().db
-    if db_path.exists():
-        sys.exit(f"{db_path} already exists: nothing done (use `migrate` to upgrade it).")
     db_path.parent.mkdir(parents=True, exist_ok=True)
     conn = db.connect(db_path)
     try:
-        applied = db.migrate(conn)
+        return db.migrate(conn)[-1]
     finally:
         conn.close()
-    print(f"Created an empty database at {db_path} (schema v{applied[-1]}).")
-    print("Next: `uv run career-console boards` adds official job boards of Israeli tech companies, "
+
+
+def cmd_init(args) -> None:
+    """A new, empty database: for a start without a tracker spreadsheet to import."""
+    db_path = Path(args.db) if args.db else paths().db
+    if db_path.exists():
+        sys.exit(f"{db_path} already exists: nothing done (use `migrate` to upgrade it).")
+    version = create_database(db_path)
+    print(f"Created an empty database at {db_path} (schema v{version}).")
+    print("Next: `uv run career-console boards discover` adds official job boards of Israeli tech companies, "
           "`uv run career-console start` opens the console.")
 
 
@@ -345,6 +350,9 @@ def cmd_serve(args) -> None:
     import uvicorn
     from app.web import create_app
     db_path = Path(args.db) if args.db else paths().db
+    if not db_path.exists():   # the first start (from the desktop icon too): an empty database
+        create_database(db_path)
+        print(f"First start: created an empty database at {db_path}")
     with socket.socket() as probe:
         if probe.connect_ex((host, args.port)) == 0:
             sys.exit(f"Port {args.port} is already in use — Career Console may already be running at "

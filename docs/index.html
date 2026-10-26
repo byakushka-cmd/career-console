@@ -1,0 +1,182 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Career Console</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 32 32%27%3E%3Crect x=%272%27 y=%272%27 width=%2728%27 height=%2728%27 rx=%278%27 fill=%27%23161A20%27/%3E%3Cpath d=%27M9 21l4.5-5 3.5 3 6-8%27 fill=%27none%27 stroke=%27%235FD8A9%27 stroke-width=%272.4%27 stroke-linecap=%27round%27 stroke-linejoin=%27round%27/%3E%3C/svg%3E">
+<meta name="description" content="A job-search console that runs on your own computer: new jobs from employers' career sites and your alert e-mails, every application with its history, employers' replies read for you.">
+<style>
+:root{
+  --bg:#07080A; --panel:#101318; --panel-2:#161A20; --ink:#F3F4F6; --ink-2:#BCC1C9; --mut:#868C95;
+  --line:rgba(255,255,255,.08); --line-2:rgba(255,255,255,.14);
+  --ai:#A6AEFF; --ai-dim:rgba(166,174,255,.11); --pr:#5FD8A9; --pr-dim:rgba(95,216,169,.11);
+  --hu:#F4B860; --hu-dim:rgba(244,184,96,.11);
+  --sans:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --mono:ui-monospace,"SF Mono",Menlo,"Roboto Mono",monospace;
+  color-scheme:dark;
+}
+@media (prefers-color-scheme:light){
+  :root{--bg:#F6F6F4; --panel:#FFFFFF; --panel-2:#F1F2F4; --ink:#0D0F12; --ink-2:#3A4049; --mut:#5E656F;
+    --line:rgba(10,12,16,.09); --line-2:rgba(10,12,16,.15);
+    --ai:#4C55C7; --ai-dim:rgba(76,85,199,.08); --pr:#0E7A52; --pr-dim:rgba(14,122,82,.08);
+    --hu:#985700; --hu-dim:rgba(196,120,0,.1); color-scheme:light}
+}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.6 var(--sans)}
+a{color:inherit}
+.wrap{max-width:1040px;margin:0 auto;padding:0 20px}
+header.top{display:flex;align-items:center;justify-content:space-between;padding-top:20px;padding-bottom:20px;border-bottom:1px solid var(--line)}
+.brand{display:flex;align-items:center;gap:10px;font-weight:600;letter-spacing:-.01em;text-decoration:none}
+.brand svg{width:26px;height:26px}
+.top nav a{color:var(--ink-2);text-decoration:none;margin-left:20px;font-size:15px}
+.top nav a:hover{color:var(--ink)}
+.hero{padding-top:72px;padding-bottom:40px}
+.kicker{font:500 12px/1 var(--mono);letter-spacing:.12em;text-transform:uppercase;color:var(--mut)}
+h1{font-size:clamp(34px,6vw,56px);line-height:1.05;letter-spacing:-.035em;margin:14px 0 18px;max-width:16ch}
+.lead{font-size:19px;color:var(--ink-2);max-width:62ch;margin:0}
+.badges{display:flex;flex-wrap:wrap;gap:8px;margin:26px 0 0;padding:0;list-style:none}
+.badge{display:inline-flex;align-items:center;gap:7px;font:500 13px/1 var(--sans);padding:7px 11px;border-radius:999px;border:1px solid var(--line-2);color:var(--ink-2)}
+.badge i{width:7px;height:7px;border-radius:50%;background:currentColor}
+.badge.pr{color:var(--pr);background:var(--pr-dim);border-color:transparent}
+.badge.ai{color:var(--ai);background:var(--ai-dim);border-color:transparent}
+.badge.hu{color:var(--hu);background:var(--hu-dim);border-color:transparent}
+.install{margin:40px 0 0;background:var(--panel);border:1px solid var(--line-2);border-radius:14px;padding:22px}
+.install h2{font-size:15px;margin:0 0 12px;font-weight:600}
+.cmd{display:flex;gap:10px;align-items:stretch}
+.cmd code{flex:1;min-width:0;overflow-x:auto;white-space:nowrap;background:var(--panel-2);border:1px solid var(--line);border-radius:10px;padding:13px 14px;font:14px/1.4 var(--mono);color:var(--ink)}
+.cmd button{flex:none;font:600 14px var(--sans);color:var(--bg);background:var(--pr);border:0;border-radius:10px;padding:0 18px;cursor:pointer}
+.cmd button:focus-visible{outline:2px solid var(--ai);outline-offset:2px}
+.install p{margin:12px 0 0;color:var(--mut);font-size:14px}
+section{padding:56px 0;border-top:1px solid var(--line)}
+section h2{font-size:28px;letter-spacing:-.025em;margin:0 0 8px}
+section > .wrap > p.sub{color:var(--ink-2);margin:0 0 28px;max-width:62ch}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:14px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:20px}
+.card h3{font-size:17px;margin:12px 0 6px;letter-spacing:-.01em}
+.card p{margin:0;color:var(--ink-2);font-size:15px}
+.shot{margin:28px 0 0;border:1px solid var(--line-2);border-radius:14px;overflow:hidden;background:var(--panel)}
+.shot img{display:block;width:100%;height:auto}
+.shot figcaption{padding:10px 14px;color:var(--mut);font-size:13px;border-top:1px solid var(--line)}
+ol.steps{margin:0;padding:0;list-style:none;counter-reset:s;display:grid;gap:14px}
+ol.steps li{counter-increment:s;background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:18px 18px 18px 60px;position:relative}
+ol.steps li::before{content:counter(s);position:absolute;left:18px;top:17px;width:28px;height:28px;border-radius:50%;display:grid;place-items:center;font:600 14px var(--mono);background:var(--ai-dim);color:var(--ai)}
+ol.steps b{display:block;margin-bottom:2px}
+ol.steps span{color:var(--ink-2);font-size:15px}
+table{width:100%;border-collapse:collapse;font-size:15px}
+td{padding:11px 0;border-bottom:1px solid var(--line);vertical-align:top}
+td:first-child{width:220px;font-weight:600;padding-right:16px}
+td:last-child{color:var(--ink-2)}
+footer{padding-top:36px;padding-bottom:56px;border-top:1px solid var(--line);color:var(--mut);font-size:14px}
+@media (max-width:600px){
+  .hero{padding-top:44px;padding-bottom:28px}
+  .top nav a:not(:last-child){display:none}
+  .cmd{flex-direction:column}
+  .cmd button{padding:12px}
+  td:first-child{width:auto;display:block;padding-bottom:0;border:0}
+  td{display:block}
+}
+</style>
+</head>
+<body>
+<header class="top wrap">
+  <a class="brand" href="#">
+    <svg viewBox="0 0 32 32" aria-hidden="true"><rect x="2" y="2" width="28" height="28" rx="8" fill="var(--panel-2)" stroke="var(--line-2)"/><path d="M9 21l4.5-5 3.5 3 6-8" fill="none" stroke="var(--pr)" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    Career Console
+  </a>
+  <nav><a href="#features">What it does</a><a href="#start">First steps</a><a href="https://github.com/byakushka-cmd/career-console">Source</a></nav>
+</header>
+
+<main>
+<div class="wrap hero">
+  <span class="kicker">Job search · runs on your computer</span>
+  <h1>Your job search in one place, on your own computer</h1>
+  <p class="lead">New jobs from employers' official career sites and from your job-alert e-mails, every application with its
+    history, and employers' replies read for you. No account, no cloud, no AI, no subscription.</p>
+  <ul class="badges">
+    <li class="badge pr"><i></i>Your data stays on your computer</li>
+    <li class="badge ai"><i></i>Official career sites, every few hours</li>
+    <li class="badge hu"><i></i>Every rule visible, every rule can be turned off</li>
+  </ul>
+  <div class="install" id="install">
+    <h2>Install on a Mac: paste this into Terminal</h2>
+    <div class="cmd">
+      <code id="cmd">curl -fsSL https://raw.githubusercontent.com/byakushka-cmd/career-console/main/install.sh | bash</code>
+      <button type="button" id="copy">Copy</button>
+    </div>
+    <p>A few minutes the first time. It puts three icons on your desktop: <b>Career Console</b> opens it from then on.
+      Run the same line again to update; your data stays. Linux or Windows: <a href="https://github.com/byakushka-cmd/career-console#manual-install-linux-windows-or-without-the-script">manual install</a>.</p>
+  </div>
+</div>
+
+<section id="features">
+  <div class="wrap">
+    <h2>What it does</h2>
+    <p class="sub">Built for a job search in Israel: Hebrew and English titles, Israeli job boards, the regions of the country.</p>
+    <div class="grid">
+      <div class="card"><span class="badge ai"><i></i>New Opportunities</span>
+        <h3>Jobs from the employers themselves</h3>
+        <p>About a hundred official career sites (Greenhouse, Lever, Ashby, Comeet, Workday) checked every few hours. You see the jobs that match your terms, are in the regions you choose and are not in your list yet. Lead roles first.</p></div>
+      <div class="card"><span class="badge ai"><i></i>Alert e-mails</span>
+        <h3>LinkedIn, AllJobs and Drushim alerts</h3>
+        <p>Read from your own Gmail, read-only, and put through the same rules: no repeats of jobs you already know, the employer's own posting first.</p></div>
+      <div class="card"><span class="badge pr"><i></i>My Pipeline</span>
+        <h3>Every application with its history</h3>
+        <p>Status, notes and history for each application; lead roles and engineer roles apart. Add one in seconds: paste a link and a few words, or dictate them.</p></div>
+      <div class="card"><span class="badge pr"><i></i>Replies</span>
+        <h3>Confirmations and rejections, read for you</h3>
+        <p>"We got your application" marks it as sent; "we decided not to move forward" closes it. Your own later update always wins.</p></div>
+      <div class="card"><span class="badge hu"><i></i>Filters</span>
+        <h3>Nothing is hidden without a reason</h3>
+        <p>Excluded words, regions, junior positions, jobs you already know: each rule shows how many jobs it holds back and can be switched off.</p></div>
+      <div class="card"><span class="badge"><i></i>Private</span>
+        <h3>One folder on your computer</h3>
+        <p>Your database, settings and mailbox password stay in the console's <code>data</code> folder. It listens only on your computer and contacts only the career sites and your mailbox.</p></div>
+    </div>
+    <figure class="shot"><img src="img/opportunities.png" alt="New Opportunities: jobs from official career sites, with their links and marks" width="1440" height="900">
+      <figcaption>New Opportunities (example data)</figcaption></figure>
+    <figure class="shot"><img src="img/pipeline.png" alt="My Pipeline: applications by status, lead roles apart" width="1440" height="900">
+      <figcaption>My Pipeline (example data)</figcaption></figure>
+  </div>
+</section>
+
+<section id="start">
+  <div class="wrap">
+    <h2>First steps</h2>
+    <p class="sub">After the install, the console opens in your browser.</p>
+    <ol class="steps">
+      <li><b>Search settings</b><span>Your search terms, excluded words, your level and the regions that are too far for you. The defaults are for QA and test automation, lead and senior roles: change them to your field.</span></li>
+      <li><b>Connect your Gmail</b><span>In Search settings → Job-alert e-mails. Gmail needs an app password, not your normal one: turn on 2-Step Verification at myaccount.google.com/security, then create an app password at myaccount.google.com/apppasswords. The mailbox is opened read-only.</span></li>
+      <li><b>Add your applications so far</b><span>"Add an application" on My Pipeline: the search never shows them to you as new.</span></li>
+      <li><b>Let it search by itself</b><span>Every two hours from 8:00 to 22:00: <code>cd ~/CareerConsole &amp;&amp; uv run career-console schedule --install</code>. Or press <b>Search Jobs Now</b> on your desktop.</span></li>
+    </ol>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <h2>Good to know</h2>
+    <table>
+      <tr><td>What it costs</td><td>Nothing. No paid services, no API keys.</td></tr>
+      <tr><td>What it needs</td><td>A Mac for the one-line install and the desktop icons; on Linux and Windows it runs from the terminal.</td></tr>
+      <tr><td>Where your data is</td><td><code>~/CareerConsole/data</code>: never uploaded, never part of the code you download.</td></tr>
+      <tr><td>Backups</td><td><code>uv run career-console backup</code> writes one self-contained file; <code>restore</code> brings it back.</td></tr>
+      <tr><td>LinkedIn</td><td>Never scraped. LinkedIn jobs come only from the alert e-mails LinkedIn sends you.</td></tr>
+    </table>
+  </div>
+</section>
+</main>
+
+<footer class="wrap">Career Console · <a href="https://github.com/byakushka-cmd/career-console">source and documentation</a></footer>
+
+<script>
+document.getElementById("copy").addEventListener("click", function () {
+  var b = this, text = document.getElementById("cmd").textContent;
+  (navigator.clipboard ? navigator.clipboard.writeText(text) : Promise.reject()).then(function () {
+    b.textContent = "Copied"; setTimeout(function () { b.textContent = "Copy"; }, 1600);
+  }, function () { b.textContent = "Select and copy"; });
+});
+</script>
+</body>
+</html>

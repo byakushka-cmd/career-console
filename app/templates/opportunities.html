@@ -220,7 +220,7 @@
 {% if mail_replies %}
 <section class="section" id="replies">
   <details class="panel fold"><summary><h2>Replies to your applications <span class="count">{{ mail_replies|length }}</span></h2></summary>
-    <p class="fine fold-body">Employers' e-mails about your applications, read with your alerts: a confirmation sets the record to Applied (or adds it), a no to Rejected by them; your own later update is never overwritten. What the console could not place changes nothing: set it yourself, or ask Claude.</p>
+    <p class="fine fold-body">Employers' e-mails about your applications, read with your alerts: a confirmation sets the record to Applied (or adds it), a no to Rejected by them; your own later update is never overwritten. What the console could not place changes nothing: set the status on the record yourself.</p>
     <ul class="mail-held fold-body">
       {%- for r in mail_replies %}
       <li><span class="mono mut">{{ r.received_at_utc|local_time }}</span>
