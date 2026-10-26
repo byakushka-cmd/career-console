@@ -1,0 +1,115 @@
+{% extends "base.html" %}
+{% from "_macros.html" import record_row, kpi_tiles, status_mix, run_bar %}
+{% block title %}My Pipeline{% endblock %}
+{% block content %}
+<div class="head">
+  <span class="kicker mono up">My Pipeline · {{ total }} records</span>
+  <h1>Everything you have tracked</h1>
+  <p class="lead">Every tracker and Comeet index record, closed ones included. Badges are a provisional reading; your original text is always kept.</p>
+</div>
+
+<section class="panel quick-add" id="add" aria-labelledby="add-title">
+  <h2 id="add-title">Add an application</h2>
+  {% if quick_error %}<div class="callout" role="alert"><span class="t">Not added yet</span><p>{{ quick_error }}</p></div>{% endif %}
+  <form method="post" action="/added">
+    <label class="field">Link <small>optional · the job page, LinkedIn or anything</small>
+      <input class="note-input" type="url" name="url" value="{{ quick_form.url or '' }}" placeholder="https://…"></label>
+    <label class="field" for="quick-text">A few words <small>paste the job card, or dictate: company, role, how you applied</small></label>
+    <div class="dictate-row">
+      <textarea class="note-input" id="quick-text" name="text" rows="2" maxlength="8000" dir="auto"
+                placeholder="Company logo for, Acme Cloud. · 1234 QA Team Lead · Tel Aviv">{{ quick_form.text or '' }}</textarea>
+      <div class="dictate" hidden data-dictate-box>
+        <button class="btn" type="button" data-dictate="quick-text" data-lang="dictate-lang" aria-pressed="false"
+                title="Speak instead of typing. Your browser recognises the speech (Safari: Apple, Chrome: Google)"><span>🎙 Dictate</span></button>
+        <select id="dictate-lang" aria-label="Language you speak" data-dictate-lang>
+          <option value="ru-RU">Русский</option><option value="he-IL">עברית</option><option value="en-US">English</option>
+        </select>
+      </div>
+    </div>
+    <details class="more"{% if quick_form.company or quick_form.role or quick_error %} open{% endif %}>
+      <summary>Company and role, if the text does not say</summary>
+      <div class="more-body"><div class="settings-row">
+        <label class="field">Company<input class="note-input" type="text" name="company" maxlength="200" value="{{ quick_form.company or '' }}" dir="auto"></label>
+        <label class="field">Role<input class="note-input" type="text" name="role" maxlength="300" value="{{ quick_form.role or '' }}" dir="auto"></label>
+      </div></div>
+    </details>
+    <div class="choices">
+      {%- for code, label in quick_start.items() %}
+      <button class="btn{{ ' solid' if loop.first else '' }}" type="submit" name="state" value="{{ code }}">{{ label }}</button>
+      {%- endfor %}
+    </div>
+  </form>
+</section>
+
+{{ run_bar(search_run, '/pipeline') }}
+{{ kpi_tiles(overview.tiles) }}
+{% if overview.leads %}<p class="fine leads-link"><a class="link" href="/opportunities?tab=leads">Potential leads ({{ overview.leads }})</a> — LinkedIn posts and people you captured</p>{% endif %}
+{{ status_mix(overview) }}
+
+<form class="filters" method="get" action="/pipeline" role="search">
+  <div class="search">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="m20 20-4.2-4.2"/></svg>
+    <input type="search" name="q" value="{{ q }}" placeholder="Company, role, contact, ID" aria-label="Search records" autocomplete="off" enterkeyhint="search">
+    <button class="btn" type="submit">Search</button>
+  </div>
+  {% if group != 'all' %}<input type="hidden" name="group" value="{{ group }}">{% endif %}
+  {% if level != 'all' %}<input type="hidden" name="level" value="{{ level }}">{% endif %}
+  <details class="more"{% if source != 'all' or sort != 'updated' or review %} open{% endif %}>
+    <summary>Source, sort and review filters</summary>
+    <div class="more-body">
+      <label class="field">Source
+        <select name="source">{% for key, label in sources.items() %}<option value="{{ key }}"{% if key == source %} selected{% endif %}>{{ label }}</option>{% endfor %}</select>
+      </label>
+      <label class="field">Sort by
+        <select name="sort">{% for key, label in sorts.items() %}<option value="{{ key }}"{% if key == sort %} selected{% endif %}>{{ label }}</option>{% endfor %}</select>
+      </label>
+      <label class="check"><input type="checkbox" name="review" value="1"{% if review %} checked{% endif %}> Needs review only</label>
+      <button class="btn solid" type="submit">Apply</button>
+    </div>
+  </details>
+</form>
+
+<nav class="chips levels" aria-label="Level">
+  <a class="chip" href="{{ link(level='all') }}"{% if level == 'all' %} aria-current="true"{% endif %}>All levels <b>{{ counts['level:all'] }}</b></a>
+  {%- for key, label in levels.items() %}
+  <a class="chip{{ ' pr' if key == 'lead' else '' }}" href="{{ link(level=key) }}"{% if level == key %} aria-current="true"{% endif %}>{% if key == 'lead' %}<i></i>{% endif %}{{ label }} <b>{{ counts['level:' ~ key] }}</b></a>
+  {%- endfor %}
+</nav>
+
+<nav class="chips" aria-label="Status groups">
+  <a class="chip" href="{{ link(group='all') }}"{% if group == 'all' %} aria-current="true"{% endif %}>All <b>{{ counts['all'] }}</b></a>
+  {%- for key, (label, t, _) in groups.items() %}
+  <a class="chip {{ t }}" href="{{ link(group=key) }}"{% if group == key %} aria-current="true"{% endif %}><i></i>{{ label }} <b>{{ counts[key] }}</b></a>
+  {%- endfor %}
+</nav>
+
+<div class="result-line">
+  <span>{{ records|length }} shown{% if q %} for “{{ q }}”{% endif %}</span>
+  {% if filtered or group != 'all' or level != 'all' %}<a href="/pipeline">Clear filters</a>{% endif %}
+</div>
+
+{% if notice %}
+<div class="callout info notice" role="status">
+  <span class="t">{{ notice.ref }} · {{ status_choices.get(notice.state, notice.label) if notice.change else 'Back to the tracker reading: ' ~ notice.label }}</span>
+  <p dir="auto">{{ notice.company }} — {{ notice.role }}</p>
+  <form method="post" action="/records/{{ notice.id }}/status">
+    <input type="hidden" name="back" value="{{ list_url }}">
+    <input type="hidden" name="state" value="{{ prev or 'TRACKER' }}">
+    <button class="btn" type="submit">Undo</button>
+  </form>
+</div>
+{% endif %}
+
+{% if records %}
+<div class="list" id="list">
+  <div class="list-head mono up" aria-hidden="true"><span>Company · role</span><span>Status</span><span>Updated</span><span>Row</span></div>
+  {% for r in records %}{{ record_row(r, back=list_url) }}{% endfor %}
+</div>
+{% else %}
+<div class="panel empty">
+  <h2>No records match</h2>
+  <p>Try a shorter search: company name, part of the role, a contact name or a requisition ID.</p>
+  <a class="btn" href="/pipeline">Show all records</a>
+</div>
+{% endif %}
+{% endblock %}

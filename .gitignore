@@ -1,0 +1,26 @@
+# --- Private data: never commit -------------------------------------------
+# Snapshots, databases, backups, reports and metadata all live in data/.
+data/
+*.sqlite
+*.sqlite-wal
+*.sqlite-shm
+*.sqlite-journal
+*.db
+*.xlsx
+*.xls
+*.csv
+*.meta.json
+.env
+.env.*
+*.env
+*.log
+
+# --- Python / tooling -------------------------------------------------------
+__pycache__/
+*.pyc
+.venv/
+.pytest_cache/
+dist/
+build/
+*.egg-info/
+.DS_Store

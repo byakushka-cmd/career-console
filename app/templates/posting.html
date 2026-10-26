@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% from "_macros.html" import posting_card, status_panel %}
+{% block title %}{{ v.company }} — {{ v.posting.title }}{% endblock %}
+{% block content %}
+<a class="back" href="/opportunities?tab=verified">← Verified Jobs</a>
+<div class="head">
+  <span class="kicker mono up">Posting · {{ v.provider }} · CC {{ v.posting.id }}</span>
+  <h1 dir="auto">{{ v.posting.title }}</h1>
+  <p class="sub" dir="auto">{{ v.company }}</p>
+</div>
+{{ posting_card(v, hidden=hidden, view='posting', full=True) }}
+{% if rec %}{{ status_panel(rec, '/postings/' ~ v.posting.id ~ '#status', status_history) }}{% endif %}
+<section class="section">
+  <h2>Your decisions <span class="count">{{ history|length }}</span></h2>
+  <div class="panel rows">
+    {% for e in history %}
+    <div class="row-item"><div class="l">
+      <span>{{ posting_decisions.get(e.decision, e.decision) }}{% if e.note %} — <span dir="auto">{{ e.note }}</span>{% endif %}</span>
+      <span class="mono mut">{{ e.created_at_utc|local_time }}</span>
+    </div></div>
+    {% else %}<p class="mut">No decisions yet.</p>{% endfor %}
+  </div>
+  <p class="fine">Decisions are added to a log and never overwritten. “Already applied” puts the job in My Pipeline; Restore takes it out again.</p>
+</section>
+{% endblock %}

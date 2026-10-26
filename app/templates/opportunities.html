@@ -1,0 +1,251 @@
+{% extends "base.html" %}
+{% from "_macros.html" import posting_card, lead_card, official_links, run_bar, mail_card %}
+{% block title %}New Opportunities{% endblock %}
+{% block content %}
+<div class="head">
+  <span class="kicker mono up">New Opportunities</span>
+  <h1>What is new and worth a look</h1>
+  <p class="lead">Verified Jobs have a live official application form. Potential Leads are posts and people that may lead to a job in Israel.</p>
+</div>
+
+<nav class="tabs" aria-label="Opportunity lists">
+  <a href="/opportunities?tab=verified"{% if tab == 'verified' %} aria-current="page"{% endif %}>Verified Jobs <b>{{ verified_count }}</b></a>
+  <a href="/opportunities?tab=leads"{% if tab == 'leads' %} aria-current="page"{% endif %}>Potential Leads <b>{{ leads_count }}</b></a>
+  <a href="/opportunities?tab=mail"{% if tab == 'mail' %} aria-current="page"{% endif %}>From alerts <b>{{ mail_count }}</b></a>
+</nav>
+
+{% if tab == 'verified' %}
+{{ run_bar(search_run, '/opportunities?tab=verified') }}
+
+{% if notice %}{% set n = notice %}
+<div class="callout info notice" role="status">
+  <span class="t">{% if noted %}Note saved{% elif marked %}{{ 'Marked overqualified' if n.marked_overqualified else 'Overqualified mark removed' }}{% elif n.ev.decision %}{{ posting_decisions[n.ev.decision] }}{% else %}Back in Verified Jobs{% endif %}</span>
+  <p dir="auto">{{ n.company }} — {{ n.posting.title }}{% if n.decision_note %} · {{ n.decision_note }}{% endif %}
+    {%- if n.ev.decision == 'applied_now' %} · now in <a class="link" href="/pipeline?source=console">My Pipeline</a>{% endif %}</p>
+  {%- if n.ev.verification == 'BOARD_OFF' %}<p>{{ n.company }}’s board is turned off: none of its jobs will be shown. <a class="link" href="/opportunities/settings#sources">Search settings</a> turns it on again.</p>{% endif %}
+  {%- if n.ev.decision == 'already_applied' and not noted %}
+  {%- set recs = (n.ev.tracker_hits + n.ev.earlier)|selectattr('legacy_row_id')|list %}
+  <p>{% if recs %}Its status lives on your tracker record; if it changed (for example, they rejected you), update it there:
+    {% for h in recs[:3] %}<a class="link" href="{{ h.href }}?back={{ '/opportunities?tab=verified#jobs'|urlencode }}" dir="auto">{{ h.ref }} {{ h.role|truncate(50, true, '…') }} · {{ state_labels.get(h.state, h.state) }}</a>{% if not loop.last %} · {% endif %}{% endfor %}
+    {%- endif %}</p>
+  {%- endif %}
+  {%- if n.ev.decision and not noted and not marked %}
+  <form method="post" action="/postings/{{ n.posting.id }}/decision">
+    <input type="hidden" name="view" value="{{ showing or 'verified' }}">
+    <button class="btn" type="submit" name="decision" value="restored">Undo</button>
+  </form>
+  {%- endif %}
+</div>
+{% endif %}
+
+{%- set off_count = filters|rejectattr('on')|list|length %}
+<details class="panel fold filters" id="filters"{% if off_count or filters_open %} open{% endif %}>
+  <summary><h2>Filters</h2>
+    <span class="mut filters-state">{% if off_count %}<b class="hu-text">{{ off_count }} off</b> · their jobs are in the list, marked{% else %}all {{ filters|length }} on{% endif %}</span></summary>
+  <div class="fold-body">
+    <p class="fine">Each rule holds relevant jobs back from New jobs. Turn one off and the jobs it held back join the list, after the others, each marked with the rule. It stays off until you turn it on again; nothing is deleted.</p>
+    <ul class="filter-list">
+      {%- for f in filters %}
+      <li class="filter{{ ' off' if not f.on else '' }}">
+        <div class="filter-text"><b>{{ f.label }}</b><span>{{ f.hint }}</span></div>
+        <span class="filter-count mono" title="{{ 'Live jobs this rule alone holds back: turning it off brings them in' if f.on else 'Live jobs in the list now because this rule is off' }}">{{ f.count }} {{ 'held back' if f.on else 'let in' }}</span>
+        <form method="post" action="/opportunities/filters">
+          <input type="hidden" name="filter" value="{{ f.key }}">
+          <span class="badge {{ 'pr' if f.on else 'hu' }}"><i></i>{{ 'On' if f.on else 'Off' }}</span>
+          <button class="btn" type="submit" name="state" value="{{ 'off' if f.on else 'on' }}">{{ 'Turn off' if f.on else 'Turn on' }}</button>
+        </form>
+      </li>
+      {%- endfor %}
+      <li class="filter fixed">
+        <div class="filter-text"><b>Your decisions</b><span>jobs you hid, skipped or marked: undone one by one with Restore</span></div>
+        <span class="filter-count mono">{{ views.hidden|length }}</span>
+        <a class="btn" href="/opportunities?tab=verified&show=hidden">See them</a>
+      </li>
+      <li class="filter fixed">
+        <div class="filter-text"><b>Boards you turned off</b><span>companies whose board is no longer checked</span></div>
+        <span class="filter-count mono">{{ boards_off }}</span>
+        <a class="btn" href="/opportunities/settings#sources">Search settings</a>
+      </li>
+    </ul>
+    <p class="fine">A job held back by two rules joins the list only when both are off. Jobs from turned-off filters are never sent in the new-jobs e-mail.</p>
+  </div>
+</details>
+
+<div class="result-line" id="jobs">
+  <span>{% if showing == 'hidden' %}{{ shown|length }} hidden or skipped{% elif showing == 'older' %}{{ shown|length }} published more than {{ max_age }} days ago{% else %}{{ shown|length }} new job{{ '' if shown|length == 1 else 's' }}{% set fresh_new = shown|selectattr('is_new')|list %}{% if fresh_new %} · <b class="pr-text">{{ fresh_new|length }} new today</b>{% endif %}{% endif %}</span>
+  <span>
+    {% if showing %}<a href="/opportunities?tab=verified">Back to new jobs</a>
+    {% else %}
+      {%- if views.hidden %}<a href="/opportunities?tab=verified&show=hidden">Hidden ({{ views.hidden|length }})</a>{% endif %}
+      {%- if views.older %}{% if views.hidden %} · {% endif %}<a href="/opportunities?tab=verified&show=older"
+        title="Relevant and in Israel, but published more than {{ max_age }} days ago: kept, not shown as new">Older than {{ max_age }} days ({{ views.older|length }})</a>{% endif %}
+      {%- if views.geo_review %}{% if views.hidden or views.older %} · {% endif %}<a href="/diagnostics#runs">Needs geo review ({{ views.geo_review|length }})</a>{% endif %}
+    {% endif %}
+  </span>
+</div>
+
+{%- set flash_for = notice.posting.id if notice else none %}
+{%- set flash_text = ('Note saved' if noted else ('Marked overqualified' if marked and notice and notice.marked_overqualified
+                     else ('Overqualified mark removed' if marked else (posting_decisions[notice.ev.decision] if notice and notice.ev.decision else '')))) %}
+{% if shown %}
+<div class="jobs">{% for v in shown %}{{ posting_card(v, hidden=showing == 'hidden', view=showing or 'verified', flash=flash_text if v.posting.id == flash_for else '') }}{% endfor %}</div>
+{% else %}
+<div class="panel empty">
+  <span class="badge pr ghost"><i></i>New jobs</span>
+  <h2>{% if showing == 'hidden' %}Nothing hidden{% elif showing == 'older' %}Nothing older{% elif last_run %}No new jobs right now{% else %}Run the first search{% endif %}</h2>
+  <p>A job appears here when it is listed on the employer’s own official board (Greenhouse, Lever, Ashby, Comeet or Workday) at the latest check, was published in the last {{ max_age }} days, matches your search terms, is in Israel or open worldwide, and is not already in your tracker or decided by you.</p>
+  <p class="foot">Older jobs are kept, not deleted. Nothing is applied for automatically.</p>
+</div>
+{% endif %}
+
+{% if not showing and views.reposted %}
+<div class="result-line" id="reposted">
+  <span><b class="hu-text">Reposted by the employer</b> · {{ views.reposted|length }} job{{ '' if views.reposted|length == 1 else 's' }} you already know, published again after your last action: they are still hiring</span>
+</div>
+<div class="jobs">{% for v in views.reposted %}{{ posting_card(v, view='verified', flash=flash_text if v.posting.id == flash_for else '') }}{% endfor %}</div>
+{% endif %}
+{% elif tab == 'leads' %}
+<section class="panel lead-tools">
+  <h2>Find leads on LinkedIn</h2>
+  <p class="fine">These open LinkedIn searches in your browser. You run them yourself; nothing is automated or collected. Paste anything worth keeping below.</p>
+  <ul class="lead-links">
+    {% for link in lead_links %}<li><a class="link" href="{{ link.url }}" target="_blank" rel="noopener noreferrer">{{ link.label }} ↗</a></li>{% endfor %}
+  </ul>
+</section>
+
+<details class="panel fold add-lead"{% if lead_error or not leads.shown %} open{% endif %} id="add">
+  <summary><h2>Add a lead</h2></summary>
+  {% if lead_error %}<div class="callout" role="alert"><span class="t">Not added</span><p>{{ lead_error }}</p></div>{% endif %}
+  <form class="settings fold-body" method="post" action="/leads">
+    <label class="field">Link to the post <small>required · LinkedIn post, or any page with the offer</small>
+      <input class="note-input" type="url" name="post_url" required value="{{ lead_form.post_url }}" placeholder="https://www.linkedin.com/posts/…"></label>
+    <div class="settings-row">
+      <label class="field">Type<select name="kind">{% for k, label in lead_kinds.items() %}<option value="{{ k }}"{% if lead_form.kind == k %} selected{% endif %}>{{ label }}</option>{% endfor %}</select></label>
+      <label class="field">Posted on <small>optional</small><input class="note-input" type="date" name="posted_on" value="{{ lead_form.posted_on }}"></label>
+    </div>
+    <div class="settings-row">
+      <label class="field">Who posted<input class="note-input" type="text" name="author" maxlength="120" value="{{ lead_form.author }}" dir="auto"></label>
+      <label class="field">Their role<input class="note-input" type="text" name="author_role" maxlength="120" value="{{ lead_form.author_role }}" placeholder="Recruiter, hiring manager…" dir="auto"></label>
+    </div>
+    <label class="field">Link to the person <small>optional</small><input class="note-input" type="url" name="author_url" value="{{ lead_form.author_url }}" placeholder="https://www.linkedin.com/in/…"></label>
+    <div class="settings-row">
+      <label class="field">Company <small>if known</small><input class="note-input" type="text" name="company" maxlength="120" value="{{ lead_form.company }}" dir="auto"></label>
+      <label class="field">Role in the post<input class="note-input" type="text" name="role_signal" maxlength="200" value="{{ lead_form.role_signal }}" dir="auto"></label>
+    </div>
+    <label class="field">Where the job is <small>as the post says, e.g. “Tel Aviv, hybrid” or “Remote, worldwide”. The author’s own location does not count. Leave empty if the post does not say.</small>
+      <input class="note-input" type="text" name="job_location" maxlength="200" value="{{ lead_form.job_location }}" dir="auto"></label>
+    <label class="field">Excerpt <small>a short quote from the post</small><textarea name="excerpt" rows="4" maxlength="4000" dir="auto">{{ lead_form.excerpt }}</textarea></label>
+    <label class="field">Note <small>for you</small><input class="note-input" type="text" name="note" maxlength="2000" value="{{ lead_form.note }}" dir="auto"></label>
+    <div><button class="btn solid" type="submit">Add lead</button></div>
+  </form>
+</details>
+
+{% if lead_added %}<div class="callout info notice" role="status"><span class="t">{{ 'Already captured: added as a new observation' if merged else 'Lead added' }}</span><p>See it below{{ ' (it needs a geo check)' if leads.geo_review|selectattr('lead.id', 'equalto', lead_added)|list else '' }}.</p></div>{% endif %}
+
+<div class="result-line" id="leads">
+  <span>{{ leads.shown|length }} lead{{ '' if leads.shown|length == 1 else 's' }} in Israel or open to Israel</span>
+  <span>{% if leads.hidden %}<a href="/opportunities?tab=leads&show=hidden#leads">Hidden ({{ leads.hidden|length }})</a>{% endif %}</span>
+</div>
+{% set lead_list = leads.hidden if show_hidden_leads else leads.shown %}
+{% if lead_list %}
+<div class="jobs">{% for v in lead_list %}{{ lead_card(v, lead_official.get(v.lead.id)) }}{% endfor %}</div>
+{% else %}
+<div class="panel empty">
+  <span class="badge ai ghost"><i></i>Potential Leads</span>
+  <h2>{{ 'Nothing hidden' if show_hidden_leads else 'No leads yet' }}</h2>
+  <p>Hiring posts, recruiters and referrals that may lead to a job in Israel, including from 2nd- and 3rd-degree networks you can see. A lead needs no official application form, but it is never shown as a Verified Job.</p>
+</div>
+{% endif %}
+
+{% if leads.geo_review %}
+<section class="section">
+  <h2>Needs geo review <span class="count">{{ leads.geo_review|length }}</span></h2>
+  <p class="fine">The post does not say clearly that the job is in Israel or open to people in Israel. Check, then confirm or hide.</p>
+  <div class="jobs">{% for v in leads.geo_review %}{{ lead_card(v, lead_official.get(v.lead.id)) }}{% endfor %}</div>
+</section>
+{% endif %}
+{% if leads.outside %}
+<section class="section">
+  <details class="panel fold"><summary><h2>Not in Israel <span class="count">{{ leads.outside|length }}</span></h2></summary>
+    <div class="jobs fold-body">{% for v in leads.outside %}{{ lead_card(v, lead_official.get(v.lead.id)) }}{% endfor %}</div></details>
+</section>
+{% endif %}
+{% elif tab == 'mail' %}
+<div class="runbar panel" id="mail">
+  <div class="runbar-text">
+    {%- if not mail_boxes %}
+    <span class="badge n"><i></i>No mailbox connected</span><span class="mut">Connect your Gmail once in Search settings: the console then reads your LinkedIn, AllJobs and Drushim alert e-mails with every search.</span>
+    {%- else %}{% for r in mail_reads %}
+    <span class="badge {{ 'pr' if r.ok else 'hu' }}"><i></i>{{ r.mailbox }} · {{ r.read_at_utc|local_time }}</span>
+    <span class="mut">{% if r.ok %}{{ r.messages }} new e-mail{{ '' if r.messages == 1 else 's' }} · {{ r.new_jobs }} new job{{ '' if r.new_jobs == 1 else 's' }}{% else %}{{ r.error }}{% endif %}</span>
+    {%- else %}<span class="badge n"><i></i>Not checked yet</span>{% endfor %}{% endif %}
+  </div>
+  <div class="runbar-actions">
+    <a class="btn" href="/opportunities/settings#mail">Mail settings</a>
+    {%- if mail_boxes %}<form method="post" action="/mail/read"><button class="btn solid" type="submit">Check mail now</button></form>{% endif %}
+  </div>
+</div>
+
+<div class="result-line" id="mail-list">
+  <span>{{ mail.shown|length }} new from your alert e-mails{% if mail.held %} · {{ mail.held|length }} kept off by your rules{% endif %}</span>
+</div>
+{% if mail.shown %}
+<div class="jobs">{% for v in mail.shown %}{{ mail_card(v, done=mail_done) }}{% endfor %}</div>
+{% else %}
+<div class="panel empty">
+  <span class="badge ai ghost"><i></i>From alerts</span>
+  <h2>{{ 'Nothing new in your alerts' if mail_boxes else 'Connect your mailbox' }}</h2>
+  <p>Jobs from your LinkedIn, AllJobs and Drushim alert e-mails of the last days, after your rules: QA titles without excluded words, in Israel, not already in your tracker, not at a company you turned off. Your level first.</p>
+  <p class="foot">The mailbox is opened read-only: nothing in it is marked, moved or deleted.</p>
+</div>
+{% endif %}
+
+{% if mail.held %}
+<section class="section">
+  <details class="panel fold"><summary><h2>Kept off by your rules <span class="count">{{ mail.held|length }}</span></h2></summary>
+    <p class="fine fold-body">{% for key, n in mail.held_counts.most_common() %}{{ mail_held[key] }} {{ n }}{% if not loop.last %} · {% endif %}{% endfor %}. A rule got it wrong? Add the job anyway.</p>
+    <ul class="mail-held">
+      {%- for v in mail.held %}{% set j = v.job %}
+      <li id="mail-{{ j.id }}"><a class="link" href="{{ j.url }}" target="_blank" rel="noopener noreferrer" dir="auto">{{ j.title }}</a>
+        <span class="mut" dir="auto">{{ j.company or 'company not named' }} · {{ j.location or '—' }}</span>
+        <span class="tag">{{ mail_held[v.held[0]] }}</span>
+        {%- if v.reasons.get(v.held[0]) %}<span class="fine" dir="auto">{{ v.reasons[v.held[0]] }}</span>{% endif %}
+        <form method="post" action="/mail/{{ j.id }}/decision"><button class="btn quiet" type="submit" name="decision" value="DISCOVERED" title="Into your tracker as Interested — not applied yet">Add as Interested</button></form></li>
+      {%- endfor %}
+    </ul>
+  </details>
+</section>
+{% endif %}
+
+{% if mail_replies %}
+<section class="section" id="replies">
+  <details class="panel fold"><summary><h2>Replies to your applications <span class="count">{{ mail_replies|length }}</span></h2></summary>
+    <p class="fine fold-body">Employers' e-mails about your applications, read with your alerts: a confirmation sets the record to Applied (or adds it), a no to Rejected by them; your own later update is never overwritten. What the console could not place changes nothing: set it yourself, or ask Claude.</p>
+    <ul class="mail-held fold-body">
+      {%- for r in mail_replies %}
+      <li><span class="mono mut">{{ r.received_at_utc|local_time }}</span>
+        <span class="badge {{ 'hu' if r.kind == 'rejected' else 'pr' }}"><i></i>{{ 'Rejection' if r.kind == 'rejected' else 'Confirmation' }}</span>
+        <span dir="auto">{{ r.company or r.sender }}{% if r.title %} — {{ r.title }}{% endif %}</span>
+        {%- if r.record_href %} <a class="link" href="{{ r.record_href }}">{{ r.record_ref }}</a>{% elif r.record_ref %} <span class="mono">{{ r.record_ref }}</span>{% endif %}
+        <span class="{{ 'hu-text' if r.action.startswith('not matched') else 'mut' }}">{{ r.action }}</span></li>
+      {%- endfor %}
+    </ul>
+  </details>
+</section>
+{% endif %}
+
+{% if mail.decided %}
+<section class="section">
+  <details class="panel fold"><summary><h2>Your decisions <span class="count">{{ mail.decided|length }}</span></h2></summary>
+    <ul class="mail-held fold-body">
+      {%- for v in mail.decided %}{% set j = v.job %}
+      <li><span dir="auto">{{ j.title }}</span> <span class="mut" dir="auto">{{ j.company or 'company not named' }}</span>
+        <span class="tag">{{ mail_decisions[v.decision] }}{% if v.note %} · {{ v.note }}{% endif %}</span>
+        {%- if v.decision != 'added' %}<form method="post" action="/mail/{{ j.id }}/decision"><button class="btn quiet" type="submit" name="decision" value="restored">Restore</button></form>{% endif %}</li>
+      {%- endfor %}
+    </ul>
+  </details>
+</section>
+{% endif %}
+{% endif %}
+{% endblock %}

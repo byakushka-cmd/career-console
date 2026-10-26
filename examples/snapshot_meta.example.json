@@ -1,0 +1,9 @@
+{
+  "source_file_id": "<google-sheet-file-id>",
+  "source_url": "https://docs.google.com/spreadsheets/d/<google-sheet-file-id>/edit",
+  "source_last_modified_utc": "2026-10-14T05:22:15.320Z",
+  "source_timezone": "America/Los_Angeles",
+  "exported_at_utc": "2026-10-14T09:40:08+00:00",
+  "owner_aliases": ["<your first name as written in statuses, e.g. 'Not for …'>"],
+  "expected_sha256": "<sha256 of the .xlsx, optional but recommended>"
+}

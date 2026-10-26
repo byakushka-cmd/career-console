@@ -1,0 +1,90 @@
+{% extends "base.html" %}
+{% from "_macros.html" import state_badge, record_row, official_links, apply_links %}
+{% block title %}{{ a.company }} — {{ a.role }}{% endblock %}
+{% block content %}
+<a class="back" href="/pipeline">← My Pipeline</a>
+<div class="head">
+  <span class="kicker mono up">Added in console · {{ rec.ref }}</span>
+  <h1 dir="auto">{{ a.role }}</h1>
+  <p class="sub" dir="auto">{{ a.company }}{% if a.location %} · {{ a.location }}{% endif %}</p>
+  <div class="title-badges">
+    {{ state_badge(rec.state, rec.label) }}
+    {% if a.applied %}<span class="badge n ghost">Applied {{ a.applied }}</span>{% endif %}
+    {% if a.job_ids %}<span class="badge n ghost mono">#{{ a.job_ids|join(', #') }}</span>{% endif %}
+    {% if rec.agency %}<span class="tag">agency · {{ rec.agency }}</span>{% endif %}
+  </div>
+  {{ apply_links(rec, also) }}
+</div>
+
+{% if new %}
+<div class="callout info notice" role="status">
+  <span class="t">Added to My Pipeline</span>
+  <p dir="auto">Read from what you gave: <b>{{ a.company }}</b> — <b>{{ a.role }}</b>{% if a.job_ids %} · job ID #{{ a.job_ids|join(', #') }}{% endif %}{% if a.location %} · {{ a.location }}{% endif %}{% if a.url %} · {{ link_label(a.url) }}{% endif %}.
+    Something read wrongly? Correct it below. The search will not bring this job as new again.</p>
+</div>
+{% endif %}
+
+<section class="section first" id="status">
+  <h2>Status</h2>
+  <div class="panel status-panel">
+    <p class="status-now">{{ state_badge(rec.state, rec.label) }}
+      <span class="mut">set by you · {{ a.changed_at_utc|local_time }}{% if a.note %} · <span dir="auto">{{ a.note }}</span>{% endif %}</span></p>
+    {% if rec.state == 'EXPIRED' %}<p class="fine">Closed automatically: not applied to within {{ expire_days }} days of its last movement ({{ a.moved }}). Press any status to bring it back.</p>{% endif %}
+    <form class="decide" method="post" action="/added/{{ a.id }}/status">
+      <div class="choices">
+        {%- for code, label in status_choices.items() %}
+        <button class="btn" type="submit" name="state" value="{{ code }}" title="{{ status_hints[code] }}"{% if code == a.status %} aria-pressed="true"{% endif %}>{{ label }}</button>
+        {%- endfor %}
+      </div>
+      <label class="field">Note <small>optional · write it first, it is saved with the status you press above</small>
+        <textarea class="note-input" name="note" rows="1" maxlength="2000" placeholder="Why, in a few words" dir="auto"></textarea></label>
+    </form>
+    <ol class="ritem-history">
+      {%- for e in history %}
+      <li><span class="mono mut">{{ e.created_at_utc|local_time }}</span> {{ status_choices.get(e.decision, 'Corrected: was ' ~ e.note if e.decision == 'edited' else e.decision) }}{% if e.note and e.decision != 'edited' %} — <span dir="auto">{{ e.note }}</span>{% endif %}</li>
+      {%- endfor %}
+    </ol>
+  </div>
+</section>
+
+{% if rec.lead_here %}
+<section class="section" id="lead-here">
+  <h2>Applied here as a lead <span class="count">{{ rec.lead_here|length }}</span></h2>
+  <p class="lead mb">You applied through {{ a.company.split(' / ')[0] }} at your level. Your rule: not again through the same agency as an engineer.</p>
+  <div class="list">{% for r in rec.lead_here %}{{ record_row(r, back='/added/' ~ a.id) }}{% endfor %}</div>
+</section>
+{% endif %}
+
+{% if rec.possibly_same %}
+<section class="section" id="possibly-same">
+  <h2>Possibly the same position <span class="count">{{ rec.possibly_same|length }}</span></h2>
+  <p class="lead mb">The same level through another recruiter or source. Nothing is merged: compare what each one says.</p>
+  <div class="list">{% for r, why in rec.possibly_same %}{{ record_row(r, back='/added/' ~ a.id) }}<p class="fine why">{{ r.ref }}: {{ why }}</p>{% endfor %}</div>
+</section>
+{% endif %}
+
+<section class="section">
+  <details class="panel fold"{% if new %} open{% endif %} id="edit">
+    <summary><h2>Correct what was read</h2></summary>
+    <form class="settings fold-body" method="post" action="/added/{{ a.id }}/edit">
+      <div class="settings-row">
+        <label class="field">Company<input class="note-input" type="text" name="company" maxlength="200" required value="{{ a.company }}" dir="auto"></label>
+        <label class="field">Role<input class="note-input" type="text" name="role" maxlength="300" required value="{{ a.role }}" dir="auto"></label>
+      </div>
+      <label class="field">Link<input class="note-input" type="url" name="url" value="{{ a.url or '' }}" placeholder="https://…"></label>
+      <div class="settings-row">
+        <label class="field">Job ID <small>numbers, e.g. 8073</small><input class="note-input" type="text" name="job_ids" value="{{ a.job_ids|join(', ') }}"></label>
+        <label class="field">Location<input class="note-input" type="text" name="location" maxlength="120" value="{{ a.location or '' }}" dir="auto"></label>
+      </div>
+      <div><button class="btn solid" type="submit">Save</button></div>
+    </form>
+  </details>
+</section>
+
+{% if a.pasted %}
+<section class="section">
+  <h2>What you gave</h2>
+  <div class="jd-text" dir="auto">{{ a.pasted }}</div>
+</section>
+{% endif %}
+{% endblock %}

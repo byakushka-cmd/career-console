@@ -1,0 +1,460 @@
+{% macro state_badge(state, label=None) -%}
+<span class="badge {{ tone(state) }}"><i></i>{{ label or state_labels.get(state, state or '—') }}</span>
+{%- endmacro %}
+
+{% macro run_bar(r, back) -%}
+{#- the search: when it last ran, and a button to run it now (r: run_state() in web.py) #}
+<div class="runbar panel" id="search">
+  <div class="runbar-text">
+    {% if r.running or r.notice == 'started' %}
+    <span class="badge ai"><i></i>Search running…</span><span class="mut">Checking {{ r.boards }} official boards. Refresh in a minute.</span>
+    {% elif r.last %}
+    <span class="badge {{ 'pr' if r.last.status == 'finished' and not r.last.sources_failed else 'hu' }}"><i></i>Last search {{ r.last.started_at_utc|local_time }}</span>
+    <span class="mut">{{ r.last.sources_ok }} boards checked{% if r.last.sources_failed %}, {{ r.last.sources_failed }} failed{% endif %} · {{ r.last.postings_seen }} postings · $0.00</span>
+    {% else %}
+    <span class="badge n"><i></i>No search yet</span><span class="mut">{{ r.boards }} official boards are set up.</span>
+    {% endif %}
+    {% if r.notice == 'busy' %}<span class="tag hu">a search is already running</span>{% endif %}
+  </div>
+  <div class="runbar-actions">
+    <a class="btn" href="/opportunities/settings">Search settings</a>
+    <form method="post" action="/search/run"><input type="hidden" name="back" value="{{ back }}">
+      <button class="btn solid" type="submit"{% if r.running %} disabled{% endif %}>Run search now</button></form>
+  </div>
+</div>
+{%- endmacro %}
+
+{% macro kpi_tiles(tiles) -%}
+<div class="kpis">
+  {%- for t in tiles %}
+  <a class="kpi {{ t.tone }}" href="{{ t.href }}">
+    <span class="lbl mono up"><i aria-hidden="true"></i>{{ t.label }}</span>
+    <b>{{ t.value }}</b>
+    <small>{{ t.caption }}</small>
+  </a>
+  {%- endfor %}
+</div>
+{%- endmacro %}
+
+{% macro status_mix(o) -%}
+<div class="mix panel">
+  <div class="mix-head"><span class="mono up mut">Pipeline mix</span><span class="mono mut">{{ o.total }} records</span></div>
+  <svg class="mix-bar" width="100%" height="10" role="img"
+       aria-label="{% for s in o.segments %}{{ s.label }} {{ s.count }}{% if not loop.last %}, {% endif %}{% endfor %}">
+    {%- for s in o.segments if s.count %}
+    <rect class="seg {{ s.tone }}" x="{{ s.x }}%" y="0" width="{{ s.w }}%" height="10" rx="4"><title>{{ s.label }} · {{ s.count }} ({{ s.pct }}%)</title></rect>
+    {%- endfor %}
+  </svg>
+  <div class="mix-legend">
+    {%- for s in o.segments %}
+    <a href="/pipeline?group={{ s.group }}"><i class="{{ s.tone }}" aria-hidden="true"></i>{{ s.label }} <b>{{ s.count }}</b> <span class="mut">{{ s.pct }}%</span></a>
+    {%- endfor %}
+  </div>
+</div>
+{%- endmacro %}
+
+{% macro record_row(r, back='') -%}
+<a class="rec" id="rec-{{ r.id }}" href="{{ r.href }}{% if back and r.sheet != 'Career Console' %}?back={{ back|urlencode }}{% endif %}">
+  <div class="rec-main"><span class="co" dir="auto">{{ r.company }}{% if r.level == 'lead' %} <span class="tag pr-tag" title="Lead, manager or head role: your first priority">lead</span>{% endif %}</span><span class="role" dir="auto">{{ r.role }}</span></div>
+  <div class="rec-state">
+    {{ state_badge(r.state, r.label) }}
+    {%- if r.group_size > 1 %}<span class="tag ai" title="Auto-linked: same requisition seen in {{ r.group_size }} rows">linked ×{{ r.group_size }}</span>{% endif %}
+    {%- if r.issues %}<span class="tag hu" title="{{ r.issues }} review item(s)">review</span>{% endif %}
+    {%- if r.vacancy %}<span class="tag" title="Job ID: the same company + the same ID is the same job">#{{ r.vacancy|join(', #') }}</span>{% elif r.agency %}<span class="tag hu" title="Agency record without a job ID: add it in a status note, e.g. #151117">no job ID</span>{% endif %}
+    {%- if r.official %}<span class="tag pr-tag" title="A likely official posting was found: see the record">official link found</span>{% endif %}
+    {%- if r.lead_here %}<span class="tag hu" title="Your rule: you applied through this agency as a lead ({% for o in r.lead_here[:3] %}{{ o.ref }}{% if not loop.last %}, {% endif %}{% endfor %}); not again here as an engineer">applied here as lead ×{{ r.lead_here|length }}</span>{% endif %}
+    {%- if r.possibly_same %}<span class="tag ai" title="Possibly the same position via another recruiter or source: {% for o, why in r.possibly_same %}{{ o.ref }} ({{ why }}){% if not loop.last %}; {% endif %}{% endfor %}">possibly the same ×{{ r.possibly_same|length }}</span>{% endif %}
+    {%- if r.change %}<span class="tag" title="{{ r.change.note or 'Status set by you' }}">{{ 'set by you' if r.change.source == 'you' else 'via CC ' ~ r.change.posting_id }}</span>{% endif %}
+    {%- if r.raw_differs %}<span class="raw" dir="auto" title="Original status text">{{ r.status_raw }}</span>{% endif %}
+  </div>
+  <div class="rec-side">
+    <span class="rec-ref mono" title="{{ r.sheet }} row {{ r.row }}">{{ r.ref }}</span>
+    <span class="rec-date mono" title="Last update">{{ r.updated or '—' }}</span>
+  </div>
+</a>
+{%- endmacro %}
+
+{% macro review_item(i, by_id, back, show_rows=True) -%}
+{%- set urgent = i.is_open and i.needs_attention %}
+<article class="ritem{{ ' urgent' if urgent else '' }}{{ ' done' if not i.is_open else '' }}" id="{{ i.anchor }}">
+  <div class="ritem-head">
+    <span class="tag{{ ' hu' if urgent else (' ai' if i.kind == 'duplicate_review' else '') }}">{{ i.severity.replace('_', ' ') }}</span>
+    <h3>{{ i.title }}</h3>
+    {%- if i.latest %}<span class="badge {{ 'pr' if not i.is_open else 'hu' }} ritem-state"><i></i>{{ i.latest.label }}</span>{% endif %}
+  </div>
+  <p class="ritem-detail">{{ i.detail }}</p>
+  {%- if show_rows and i.row_ids %}
+  <div class="ritem-rows">
+    {%- for rid in i.row_ids if rid in by_id %}{% set r = by_id[rid] %}
+    <a href="/records/{{ r.id }}"><span class="mono mut">{{ r.ref }}</span> <span dir="auto">{{ r.company }} — {{ r.role }}</span></a>
+    {%- endfor %}
+  </div>
+  {%- endif %}
+  <p class="mono mut ritem-hint">{{ i.hint }}</p>
+  {%- if i.history %}
+  <ol class="ritem-history">
+    {%- for e in i.history %}
+    <li><span class="mono mut" title="{{ e.created_at_utc }}">{{ e.created_at_utc|local_time }}</span> {{ e.label }}{% if e.note %} — <span dir="auto">{{ e.note }}</span>{% endif %}</li>
+    {%- endfor %}
+  </ol>
+  {%- endif %}
+  <form class="decide" method="post" action="/review/{{ i.kind }}/{{ i.id }}">
+    <input type="hidden" name="back" value="{{ back }}">
+    <div class="choices">
+      {%- for value, label in i.choices %}
+      <button class="btn{{ ' solid' if loop.first and i.is_open else '' }}" type="submit" name="decision" value="{{ value }}">{{ label }}</button>
+      {%- endfor %}
+    </div>
+    <textarea class="note-input" name="note" rows="1" maxlength="2000" placeholder="Note (optional)" dir="auto"
+              aria-label="Note for this decision" title="Write it first: it is saved with the decision you press"></textarea>
+  </form>
+</article>
+{%- endmacro %}
+
+{% macro tracker_link(h, here) -%}
+<a class="link mono" href="{{ h.href }}{% if h.legacy_row_id is not none %}?back={{ here|urlencode }}{% endif %}"
+   title="Open the record: its status (e.g. Rejected by them) is updated there">{{ h.ref }}</a>
+{%- endmacro %}
+
+{% macro posting_card(v, hidden=False, view='verified', full=False, flash='') -%}
+{%- set p = v.posting %}{% set e = v.ev %}
+{#- where a tracker record opened from this card returns to #}
+{%- set here = '/postings/' ~ p.id if full else '/opportunities?tab=verified' ~ ('&show=hidden' if hidden else '') ~ '#posting-' ~ p.id %}
+{%- set rejected_here = e.earlier|selectattr('state', 'equalto', 'REJECTED')|list %}
+{%- set applied_here = e.earlier|selectattr('state', 'in', ['APPLIED', 'IN_PROCESS', 'INTERVIEW', 'OUTREACH'])|list %}
+<article class="job" id="posting-{{ p.id }}">
+  <div class="job-top">
+    <div class="job-title">
+      <span class="co" dir="auto">{{ v.company }}</span>
+      <h3 dir="auto">{% if full %}{{ p.title }}{% else %}<a class="title-link" href="/postings/{{ p.id }}">{{ p.title }}</a>{% endif %}</h3>
+    </div>
+    <div class="job-links">
+      {%- if not full %}<a class="btn" href="/postings/{{ p.id }}" title="The whole job: description, location, freshness — before you apply">View job</a>{% endif %}
+      <a class="btn solid job-apply" href="{{ p.apply_url or p.url }}" target="_blank" rel="noopener noreferrer"
+         title="Applies directly to the employer, not through an aggregator">Apply · {{ apply_destination(p.apply_url or p.url, v.company, p.provider) }} ↗</a>
+    </div>
+  </div>
+  <div class="job-meta">
+    {%- if e.geo.value == 'ISRAEL' %}<span class="badge pr" title="{{ e.geo.reason }}"><i></i>Israel · {{ p.location }}</span>{% elif e.geo.value == 'UNKNOWN' %}<span class="badge hu" title="{{ e.geo.reason }}"><i></i>Location unclear · {{ p.location or 'not given' }}</span>{% endif %}
+    {%- if e.reposted %}<span class="badge hu" title="Already in your tracker or decided by you; the employer published it again on {{ e.published_on }}, after your last action ({{ e.last_action }})"><i></i>Reposted {{ e.published_on }} · still hiring</span>{% endif %}
+    {%- if v.is_new %}<span class="badge pr" title="Appeared on the official board since its previous check"><i></i>New</span>{% endif %}
+    <span class="badge {{ e.freshness.tone }}" title="{{ e.freshness.basis }}"><i></i>{{ e.freshness.label }}{% if e.freshness.days is not none %} · {{ e.freshness.days }}d{% endif %}</span>
+    {%- if e.geo.value == 'WORLDWIDE_REMOTE' %}<span class="badge ai ghost"><i></i>Remote, worldwide</span>{% endif %}
+    {%- if e.decision in ('saved', 'maybe') %}<span class="badge pr ghost"><i></i>{{ posting_decisions[e.decision] }}</span>{% endif %}
+    {%- if e.decision == 'show_anyway' %}<span class="badge hu ghost"><i></i>Shown by your override</span>{% endif %}
+    {%- if e.decision in ('skipped', 'declined', 'hidden', 'already_applied', 'applied_now') %}<span class="badge {{ 'pr' if e.decision == 'applied_now' else 'n' }}"><i></i>{{ posting_decisions[e.decision] }}</span>{% endif %}
+    {%- if e.level == 'FOCUS' %}<span class="badge pr ghost" title="Your level: lead, manager or head of QA (Search settings → Your level)"><i></i>Lead role</span>
+    {%- elif e.level == 'ABOVE' %}<span class="tag" title="Director, VP or chief: above the level you focus on now">above your level</span>
+    {%- elif e.level == 'JUNIOR' %}<span class="tag" title="Junior, graduate, intern or student role">junior role</span>
+    {%- else %}<span class="tag" title="An engineer role, not a lead role">engineer role</span>{% endif %}
+    {%- if v.marked_overqualified %}<span class="tag hu" title="Your mark: this job is below your level (it stays in the list)">overqualified (your mark)</span>
+    {%- elif e.overqualified %}<span class="tag" title="The description asks {{ e.years_asked|join(', ') }} years of QA / engineering experience: mid-level, likely below yours (Search settings → Overqualified)">likely overqualified · asks {{ e.years_asked|max }} yrs</span>{% endif %}
+    {%- if e.narrow %}<span class="tag hu" title="The title matched only on {{ e.matched_terms|join(', ') }}: often hardware, physics or manufacturing. Check it is software QA">check: {{ e.matched_terms|join(', ') }} only</span>{% endif %}
+    {%- if e.low_priority %}<span class="tag hu" title="Screening rule: junior/manual roles are low priority">low priority: {{ e.low_priority|join(', ') }}</span>{% endif %}
+    {%- if e.mentions and e.relevance.value == 'MATCH' %}<span class="tag hu" title="Mentioned in the description; below the threshold for hiding">mentions: {{ e.mentions|join(', ')|upper }}</span>{% endif %}
+    {%- if e.dedup == 'AGENCY_SIMILAR' %}<span class="tag hu">same title in tracker — check job ID</span>{% endif %}
+    {%- if rejected_here %}<span class="tag hu" title="You have a rejection at {{ v.company }} in your tracker: see “Earlier here”">rejected here before</span>
+    {%- elif applied_here %}<span class="tag" title="You applied to {{ v.company }} before: see “Earlier here”">applied here before</span>{% endif %}
+    {%- if e.agency %}<span class="tag" title="Staffing agency or contractor: a title match alone never hides its jobs">agency</span>{% endif %}
+    {%- if e.lead_at_agency %}<span class="tag hu" title="Your rule: you applied through {{ v.company }} as a lead ({% for h in e.lead_at_agency[:3] %}{{ h.ref }}{% if not loop.last %}, {% endif %}{% endfor %}); applying here as an engineer shows the recruiter a step down. See “As lead here”">applied here as lead ×{{ e.lead_at_agency|length }}</span>{% endif %}
+    {%- set why = {'title': e.relevance.reason, 'description': e.relevance.reason, 'outside': e.geo.reason, 'geo_unclear': e.geo.reason,
+                   'place': 'a place you excluded: ' ~ p.location,
+                   'older': e.freshness.basis, 'known': e.dedup_note} %}
+    {%- for k in e.let_through %}<span class="tag hu" title="Shown because you turned this board filter off: {{ why[k] }}. Turn it on again under Filters">filter off: {{ board_filters[k][2] }}</span>{% endfor %}
+    {%- if e.vacancy %}<span class="tag" title="Job ID: the same company + the same ID is the same job">#{{ e.vacancy|join(', #') }}</span>{% endif %}
+    {%- if v.similar %}<span class="tag ai" title="Similar description elsewhere: maybe one position from several sources">possibly the same position ×{{ v.similar|length }}</span>{% endif %}
+  </div>
+  <dl class="job-facts">
+    <div><dt>Location</dt><dd dir="auto">{{ p.location or '—' }}{% if p.workplace %} · {{ p.workplace }}{% endif %}</dd></div>
+    <div><dt>Company</dt><dd dir="auto">{{ v.company }}</dd></div>
+    <div><dt>Posted</dt><dd>{% if p.posted_at %}<span class="mono">{{ p.posted_at[:10] }}</span>{% else %}not published by the source{% if p.source_updated_at %} · updated <span class="mono">{{ p.source_updated_at[:10] }}</span>{% endif %}{% endif %}</dd></div>
+    <div><dt>First seen</dt><dd class="mono">{{ p.first_seen_at_utc|local_time }}</dd></div>
+    <div><dt>Source</dt><dd>{{ v.provider }} (official board)</dd></div>
+    <div><dt>Matches</dt><dd>{{ e.matched_terms|join(', ') or '—' }} <span class="mut">· gaps not assessed automatically</span></dd></div>
+    {%- set contacts = contact_links(v.company) %}
+    {%- if contacts %}
+    <div class="wide"><dt>Contacts</dt><dd>{% for c in contacts %}<a class="link" href="{{ c.url }}" target="_blank" rel="noopener noreferrer" title="{{ c.title }} — a LinkedIn search you open yourself">{{ c.label }} ↗</a>{% if not loop.last %} · {% endif %}{% endfor %}</dd></div>
+    {%- endif %}
+    {%- if e.reposted %}<div class="wide"><dt>Reposted</dt><dd>published again on <span class="mono">{{ e.published_on }}</span>, after your last action on <span class="mono">{{ e.last_action }}</span>{% if e.decision %} ({{ posting_decisions[e.decision] }}{% if v.decision_note %}: <span dir="auto">{{ v.decision_note }}</span>{% endif %}){% endif %}</dd></div>{% endif %}
+    {%- if e.dedup != 'NEW' %}<div class="wide"><dt>Tracker</dt><dd>{{ e.dedup_note }}
+      {%- for h in e.tracker_hits if h.legacy_row_id is not none %} · {{ tracker_link(h, here) }}{% endfor %}</dd></div>{% endif %}
+    {%- if e.earlier %}
+    <div class="wide"><dt>Earlier here</dt><dd><ul class="earlier">
+      {%- for h in e.earlier[:3] %}
+      <li>{{ tracker_link(h, here) }} <span dir="auto">{{ h.role|truncate(70, true, '…') }}</span> · {{ state_labels.get(h.state, h.state) }}{% if h.applied %} <span class="mono mut">{{ '' if h.state == 'APPLIED' else '· applied ' }}{{ h.applied }}</span>{% endif %}</li>
+      {%- endfor %}
+      {%- if e.earlier|length > 3 %}<li><a class="link" href="/pipeline?q={{ v.company|urlencode }}">All {{ e.earlier|length }} records at {{ v.company }}</a></li>{% endif %}
+    </ul></dd></div>
+    {%- endif %}
+    {%- if e.lead_at_agency %}
+    <div class="wide"><dt>As lead here</dt><dd>You applied through {{ v.company }} at your level; your rule is not to apply here again as an engineer.<ul class="earlier">
+      {%- for h in e.lead_at_agency[:3] %}
+      <li>{{ tracker_link(h, here) }} <span dir="auto">{{ h.role|truncate(70, true, '…') }}</span> · {{ state_labels.get(h.state, h.state) }}{% if h.applied %} <span class="mono mut">{{ h.applied }}</span>{% endif %}</li>
+      {%- endfor %}
+      {%- if e.lead_at_agency|length > 3 %}<li><a class="link" href="/pipeline?q={{ v.company|urlencode }}">All {{ e.lead_at_agency|length }}</a></li>{% endif %}
+    </ul></dd></div>
+    {%- endif %}
+  </dl>
+  {%- if p.description and full %}
+  <section class="jd"><h4 class="fine">Job description</h4><div class="jd-text" dir="auto">{{ p.description }}</div></section>
+  {%- elif p.description %}
+  <p class="job-summary" dir="auto">{{ role_summary(p.description, 260) }} <a class="link" href="/postings/{{ p.id }}">Full description</a></p>
+  {%- else %}
+  <p class="fine">{{ v.provider }} does not publish the description in its job list: the “Apply” link opens the employer’s page with it.</p>
+  {%- endif %}
+  {%- if v.similar %}
+  <details class="similar">
+    <summary class="fine">Possibly the same position ({{ v.similar|length }}): similar description — compare what each source says</summary>
+    <ul class="similar-list">
+      {%- for other, score in v.similar %}{% set o = other.posting %}
+      <li><a class="link" href="/postings/{{ o.id }}" dir="auto">{{ other.company }} — {{ o.title }}</a>
+        <span class="mono mut">{{ (score * 100)|round|int }}% alike · {% if other.ev.decision %}{{ posting_decisions[other.ev.decision] }}{% elif other.ev.presented %}in this list{% else %}{{ other.ev.dedup_note }}{% endif %}</span></li>
+      {%- endfor %}
+    </ul>
+  </details>
+  {%- endif %}
+  <p class="fine">{{ e.verification_note }}</p>
+  {%- if hidden %}
+  <div class="job-actions">
+    <p class="decided"><span class="badge {{ 'pr' if e.decision == 'applied_now' else 'n' }}"><i></i>{{ posting_decisions[e.decision] }}</span>{% if v.decision_note %} <span dir="auto">{{ v.decision_note }}</span>{% endif %}
+      <span class="mono mut">{{ v.decided_at|local_time }}</span></p>
+    {%- if e.decision == 'applied_now' %}<a class="btn" href="/pipeline?source=console">In My Pipeline</a>{% endif %}
+    <form method="post" action="/postings/{{ p.id }}/decision"><input type="hidden" name="view" value="{{ view }}"><button class="btn" type="submit" name="decision" value="restored"
+      title="{{ 'Back to Verified Jobs; also leaves My Pipeline' if e.decision == 'applied_now' else 'Back to Verified Jobs' }}">Restore</button></form>
+  </div>
+  {%- else %}
+  {%- if flash %}<p class="flash" role="status">✓ {{ flash }}</p>{% endif %}
+  <div class="job-actions">
+    {%- for value, label, hint, cls in [('applied_now', 'Good find — applied', 'You applied now: it becomes an application in My Pipeline', 'solid'),
+                                        ('saved', 'Save', 'Keep it at the top of the list', ''),
+                                        ('maybe', 'Maybe', 'Undecided; keep it visible', ''),
+                                        ('already_applied', 'Duplicate', 'Seen it already: in your tracker, in this list or elsewhere (a duplicate the search missed)', '')] %}
+    <button class="btn {{ cls }}" type="submit" form="act-{{ p.id }}" name="decision" value="{{ value }}" title="{{ hint }}"{% if e.decision == value %} aria-pressed="true"{% endif %}>{{ label }}</button>
+    {%- endfor %}
+    <details class="notfit">
+      <summary class="btn" title="Not going on with it: say whether the search was wrong or it is your choice">Not a fit</summary>
+      <div class="notfit-body">
+        {%- for decision, title, hint, reasons in [('skipped', 'Wrong match', 'the search should not have brought it', wrong_match_reasons),
+                                                   ('declined', 'Not for me', 'the right kind of job, but you decide not to apply', not_for_me_reasons)] %}
+        <form class="notfit-group" method="post" action="/postings/{{ p.id }}/decision">
+          <input type="hidden" name="decision" value="{{ decision }}">
+          <input type="hidden" name="view" value="{{ view }}">
+          <p class="fine"><b>{{ title }}</b> — {{ hint }}</p>
+          <div class="choices">
+            {%- for reason in reasons %}<button class="btn" type="submit" name="note" value="{{ reason }}">{{ reason }}</button>{% endfor %}
+          </div>
+          <div class="notfit-own">
+            <input class="note-input" type="text" name="note" maxlength="2000" placeholder="Or your own reason" aria-label="Your own reason: {{ title }}" dir="auto">
+            <button class="btn solid" type="submit">{{ title }}</button>
+            {%- if decision == 'skipped' %}
+            <button class="btn" type="submit" name="whole_company" value="1"
+                    title="Nothing at {{ v.company }} is for you (e.g. a hardware company): marks this job and turns the company's board off. Turn it on again in Search settings">{{ title }} — whole company</button>
+            {%- endif %}
+          </div>
+        </form>
+        {%- endfor %}
+      </div>
+    </details>
+    <button class="btn" type="submit" form="act-{{ p.id }}" name="decision" value="{{ 'overqualified_off' if v.marked_overqualified else 'overqualified' }}"
+            title="{{ 'Remove your Overqualified mark' if v.marked_overqualified else 'Below your level. Only a mark: the job stays, you can still apply' }}"{% if v.marked_overqualified %} aria-pressed="true"{% endif %}>Overqualified</button>
+    <button class="btn quiet" type="submit" form="act-{{ p.id }}" name="decision" value="comment" title="Save the feedback without changing anything">Save note</button>
+    <button class="btn quiet" type="submit" form="act-{{ p.id }}" name="decision" value="hidden" title="Remove from view without a decision (noise)">Hide</button>
+  </div>
+  <form class="job-feedback" method="post" action="/postings/{{ p.id }}/decision" id="act-{{ p.id }}">
+    <input type="hidden" name="view" value="{{ view }}">
+    {%- if v.similar %}{% set top = v.similar[0][0] %}
+    <input type="hidden" name="same_as" value="{{ top.company }} — {{ top.posting.title }} (CC {{ top.posting.id }})">{% endif %}
+    <label class="sr" for="note-{{ p.id }}">Your feedback</label>
+    <textarea class="note-input" id="note-{{ p.id }}" name="note" rows="1" maxlength="2000" dir="auto" placeholder="Your feedback (optional)"
+              title="Why it fits or not. Write it first: it goes with the button you press"></textarea>
+  </form>
+  {%- endif %}
+</article>
+{%- endmacro %}
+
+{% macro official_links(matches) -%}
+{%- if matches %}
+<div class="official">
+  <span class="fine">Likely the official posting — apply directly rather than through the original link:</span>
+  <ul>
+    {%- for m in matches %}
+    <li><a class="link" href="{{ m.posting.apply_url or m.posting.url }}" target="_blank" rel="noopener noreferrer" dir="auto">{{ m.company }} — {{ m.posting.title }} ↗</a>
+      <span class="mono mut">{{ apply_destination(m.posting.apply_url or m.posting.url, m.company, m.posting.provider) }} · {{ m.reason }}</span></li>
+    {%- endfor %}
+  </ul>
+</div>
+{%- endif %}
+{%- endmacro %}
+
+{% macro mail_card(v, done=None) -%}
+{%- set j = v.job %}
+{%- set rejected_here = v.earlier|selectattr('state', 'equalto', 'REJECTED')|list %}
+{%- set applied_here = v.earlier|selectattr('state', 'in', ['APPLIED', 'IN_PROCESS', 'INTERVIEW', 'OUTREACH'])|list %}
+<article class="job" id="mail-{{ j.id }}">
+  <div class="job-top">
+    <div class="job-title">
+      <span class="co" dir="auto">{{ j.company or 'Company not named' }}</span>
+      <h3 dir="auto">{{ j.title }}</h3>
+    </div>
+    <div class="job-links">
+      {#- your order: the employer's own page first; LinkedIn or the job board only when nothing else is found #}
+      {%- if v.official %}{% set o = v.official[0] %}
+      <a class="btn solid job-apply" href="{{ o.posting.apply_url or o.posting.url }}" target="_blank" rel="noopener noreferrer"
+         title="The same job on the employer's own board ({{ o.reason }})">Apply · {{ apply_destination(o.posting.apply_url or o.posting.url, o.company, o.posting.provider) }} ↗</a>
+      {%- elif j.company and not v.agency %}
+      <a class="btn solid" href="{{ employer_search(j.company, j.title) }}" target="_blank" rel="noopener noreferrer"
+         title="A web search for this job on {{ j.company }}'s own site or ATS, LinkedIn and job boards left out. You open it in your browser">Find on {{ j.company.split(' / ')[0] }}'s site ↗</a>
+      {%- endif %}
+      <a class="btn" href="{{ j.url }}" target="_blank" rel="noopener noreferrer" title="The job on {{ j.source }}{{ ' (Easy Apply)' if j.easy_apply else '' }}">{{ j.source }} ↗</a>
+    </div>
+  </div>
+  <div class="job-meta">
+    {%- if j.location %}<span class="badge pr"><i></i>{{ j.location }}</span>{% endif %}
+    <span class="badge ai ghost" title="First e-mail that named it{% if j.mails > 1 %}; named in {{ j.mails }} e-mails{% endif %}"><i></i>{{ j.source }} alert · {{ j.first_seen_at_utc|local_time }}{% if j.mails > 1 %} · ×{{ j.mails }}{% endif %}</span>
+    {%- if v.level == 'FOCUS' %}<span class="badge pr ghost"><i></i>Lead role</span>
+    {%- elif v.level == 'ABOVE' %}<span class="tag">above your level</span>
+    {%- elif v.level == 'JUNIOR' %}<span class="tag">junior role</span>
+    {%- else %}<span class="tag">engineer role</span>{% endif %}
+    {%- if rejected_here %}<span class="tag hu" title="You have a rejection at {{ j.company }}: see Earlier here">rejected here before</span>
+    {%- elif applied_here %}<span class="tag" title="You applied to {{ j.company }} before">applied here before</span>{% endif %}
+    {%- if j.easy_apply %}<span class="tag hu" title="LinkedIn's one-click application: it is said to work worst. Look for the employer's own page first; LinkedIn only when nothing else is found">Easy Apply — employer page first</span>{% endif %}
+    {%- if v.narrow %}<span class="tag hu" title="The title matched only on quality, validation or verification: often hardware, manufacturing or medical devices. Check it is software QA">check: not clearly software</span>{% endif %}
+    {%- if v.also %}<span class="tag" title="{% for o in v.also %}{{ o.location }} · {{ o.url }}{% if not loop.last %}; {% endif %}{% endfor %}">also in {{ v.also|map(attribute='location')|join(', ') }}</span>{% endif %}
+    {%- if v.agency %}<span class="tag" title="Staffing agency: its end client is usually not named">agency</span>{% endif %}
+    {%- if v.lead_at_agency %}<span class="tag hu" title="Your rule: you applied through {{ j.company }} as a lead ({% for h in v.lead_at_agency[:3] %}{{ h.ref }}{% if not loop.last %}, {% endif %}{% endfor %}); not again here as an engineer">applied here as lead ×{{ v.lead_at_agency|length }}</span>{% endif %}
+  </div>
+  {%- if v.earlier %}
+  <p class="fine">Earlier here: {% for h in v.earlier[:3] %}{{ tracker_link(h, '/opportunities?tab=mail#mail-' ~ j.id) }} <span dir="auto">{{ h.role|truncate(50, true, '…') }}</span> · {{ state_labels.get(h.state, h.state) }}{% if not loop.last %}; {% endif %}{% endfor %}</p>
+  {%- endif %}
+  {%- set contacts = contact_links(j.company) if j.company else [] %}
+  {%- if contacts %}
+  <p class="fine">Contacts on LinkedIn: {% for c in contacts %}<a class="link" href="{{ c.url }}" target="_blank" rel="noopener noreferrer" title="{{ c.title }} — a search you open yourself">{{ c.label }} ↗</a>{% if not loop.last %} · {% endif %}{% endfor %}</p>
+  {%- endif %}
+  {%- if done == j.id %}<p class="flash" role="status">✓ Done</p>{% endif %}
+  <form class="job-actions" method="post" action="/mail/{{ j.id }}/decision">
+    <button class="btn solid" type="submit" name="decision" value="APPLIED" title="You applied: into your tracker as Applied">Applied</button>
+    <button class="btn" type="submit" name="decision" value="DISCOVERED" title="Into your tracker as Interested — not applied yet (expires after two weeks without a move)">Interested</button>
+    <button class="btn" type="submit" name="decision" value="already_applied" title="You applied to this job before (it may have been rejected): not again. The job itself is fine, so it is not a “Not a fit”">Already applied</button>
+    <button class="btn" type="submit" name="decision" value="skipped" title="The job does not suit you: kept in “Your decisions”">Not a fit</button>
+    <button class="btn quiet" type="submit" name="decision" value="hidden">Hide</button>
+    <input class="note-input" type="text" name="note" maxlength="2000" placeholder="Note (optional)" aria-label="Note" dir="auto">
+  </form>
+</article>
+{%- endmacro %}
+
+{% macro lead_card(v, official=None) -%}
+{%- set l = v.lead %}
+<article class="job lead" id="lead-{{ l.id }}">
+  <div class="job-top">
+    <div class="job-title">
+      <span class="co" dir="auto">{{ l.company or 'Company not named' }}</span>
+      <h3 dir="auto">{{ l.role_signal or 'Role not stated' }}</h3>
+    </div>
+    <a class="btn solid job-apply" href="{{ l.post_url }}" target="_blank" rel="noopener noreferrer">Open post ↗</a>
+  </div>
+  <div class="job-meta">
+    <span class="badge ai ghost"><i></i>{{ lead_kinds.get(l.kind, l.kind) }}</span>
+    {%- if v.geo.value == 'ISRAEL' %}<span class="badge pr"><i></i>Israel</span>
+    {%- elif v.geo.value == 'WORLDWIDE_REMOTE' %}<span class="badge pr ghost"><i></i>Remote, worldwide</span>
+    {%- elif v.confirmed_israel %}<span class="badge pr ghost"><i></i>You confirmed: open to Israel</span>
+    {%- elif v.geo.value == 'OUTSIDE' %}<span class="badge n"><i></i>Not in Israel</span>
+    {%- else %}<span class="badge hu"><i></i>Needs geo review</span>{% endif %}
+    {%- if v.decision in ('saved', 'maybe', 'contacted') %}<span class="badge pr ghost"><i></i>{{ lead_decisions[v.decision] }}</span>{% endif %}
+    {%- if v.observations > 1 %}<span class="tag" title="Captured {{ v.observations }} times; all captures are kept">seen ×{{ v.observations }}</span>{% endif %}
+    <span class="tag">not a verified job</span>
+  </div>
+  <dl class="job-facts">
+    <div><dt>Posted by</dt><dd dir="auto">{% if l.author_url %}<a class="link" href="{{ l.author_url }}" target="_blank" rel="noopener noreferrer">{{ l.author or 'profile' }}</a>{% else %}{{ l.author or '—' }}{% endif %}{% if l.author_role %} · {{ l.author_role }}{% endif %}</dd></div>
+    <div><dt>Job location</dt><dd dir="auto">{{ l.job_location or 'not stated' }} <span class="mut">· {{ v.geo.reason }}</span></dd></div>
+    <div><dt>Posted</dt><dd class="mono">{{ l.posted_on or 'date not given' }}</dd></div>
+    <div><dt>Captured</dt><dd class="mono">{{ l.created_at_utc|local_time }}</dd></div>
+  </dl>
+  {%- if l.excerpt %}<blockquote class="excerpt" dir="auto">{{ l.excerpt }}</blockquote>{% endif %}
+  {{ official_links(official) }}
+  {%- if v.decision_note %}<p class="fine">Your note: <span dir="auto">{{ v.decision_note }}</span></p>{% endif %}
+  <form class="job-actions" method="post" action="/leads/{{ l.id }}/decision">
+    {%- if v.decision in ('skipped', 'hidden') %}
+    <span class="badge n"><i></i>{{ lead_decisions[v.decision] }}</span>
+    <button class="btn" type="submit" name="decision" value="restored">Restore</button>
+    {%- else %}
+    {%- if l.author_url %}<a class="btn" href="{{ l.author_url }}" target="_blank" rel="noopener noreferrer">Open person ↗</a>{% endif %}
+    {%- for value, label in [('saved', 'Save'), ('maybe', 'Maybe'), ('contacted', 'Mark contacted'), ('skipped', 'Not a fit')] %}
+    <button class="btn" type="submit" name="decision" value="{{ value }}"{% if v.decision == value %} aria-pressed="true"{% endif %}>{{ label }}</button>
+    {%- endfor %}
+    {%- if not v.eligible %}<button class="btn" type="submit" name="decision" value="confirm_israel" title="You checked: the job is in Israel or open to people in Israel">Confirm: open to Israel</button>{% endif %}
+    <button class="btn quiet" type="submit" name="decision" value="hidden">Hide</button>
+    {%- endif %}
+  </form>
+</article>
+{%- endmacro %}
+
+{% macro status_panel(rec, back, status_history) -%}
+{#- a record's status and the buttons to change it (record page; a console application on its posting page) #}
+<section class="section first" id="status">
+  <h2>Status</h2>
+  <div class="panel status-panel">
+    <p class="status-now">
+      {{ state_badge(rec.state, rec.label) }}
+      {% if rec.change %}
+        <span class="mut">{{ 'set by you' if rec.change.source == 'you' else 'set automatically' }} · {{ rec.change.at_utc|local_time }}{% if rec.change.note %} · <span dir="auto">{{ rec.change.note }}</span>{% endif %}</span>
+      {% else %}<span class="mut">as read from your tracker</span>{% endif %}
+    </p>
+    {% if rec.state == 'EXPIRED' %}<p class="fine">Closed automatically: not applied to within {{ expire_days }} days of its last movement ({{ rec.moved_on }}). Nothing is deleted; press any status to bring it back.</p>{% endif %}
+    {% if rec.vacancy or rec.agency %}<p class="status-now">{% if rec.agency %}<span class="tag">agency · {{ rec.agency }}</span>{% endif %}
+      {% if rec.vacancy %}<span>Job ID <b class="mono">#{{ rec.vacancy|join(', #') }}</b> — {{ rec.company }} · {{ rec.role }}</span>
+      {% else %}<span class="hu-text">No job ID yet: write it in the note (e.g. “#151117”) with any status.</span>{% endif %}</p>{% endif %}
+    {% if rec.status_raw %}<p class="fine">Your tracker says: <span dir="auto">“{{ rec.status_raw }}”</span> (kept unchanged)</p>{% endif %}
+    <form class="decide" method="post" action="/records/{{ rec.id }}/status">
+      <input type="hidden" name="back" value="{{ back }}">
+      <div class="choices">
+        {%- for code, label in status_choices.items() %}
+        <button class="btn" type="submit" name="state" value="{{ code }}" title="{{ status_hints[code] }}"{% if code == rec.state %} aria-pressed="true"{% endif %}>{{ label }}</button>
+        {%- endfor %}
+        {%- if rec.change and rec.change.source == 'you' %}<button class="btn quiet" type="submit" name="state" value="TRACKER" title="Remove your update; history is kept">Back to tracker reading</button>{% endif %}
+      </div>
+      <label class="field">Note <small>optional · write it first, it is saved with the status you press above</small>
+        <textarea class="note-input" name="note" rows="1" maxlength="2000" placeholder="Why, in a few words" dir="auto"></textarea></label>
+    </form>
+    <p class="fine"><b>In process</b>: you are in contact with them. <b>Rejected by them</b>: they said no after you applied. <b>Not a fit</b>: you decided not to go on (skip). <b>Gone / stale</b>: the job is gone or no longer takes applications. <b>Duplicate</b>: the same job as another of your records.</p>
+    {% if status_history %}
+    <ol class="ritem-history">
+      {% for e in status_history %}<li><span class="mono mut">{{ e.created_at_utc|local_time }}</span> {{ status_choices.get(e.decision, 'Back to tracker reading') }}{% if e.note %} — <span dir="auto">{{ e.note }}</span>{% endif %}</li>{% endfor %}
+    </ol>
+    {% endif %}
+  </div>
+</section>
+{%- endmacro %}
+
+{% macro apply_links(rec, also=[]) -%}
+{#- where to apply, in your order: the employer's own posting, its site, then LinkedIn or a board; contacts (a record
+    page shows what the job's card showed: nothing is lost on the way from New Opportunities to My Pipeline) #}
+{{ official_links(rec.official) }}
+{%- set best = link_channel(rec.url) if rec.url else none %}
+{%- set ended = tone(rec.state) == 'n' %}
+{%- set find_on_site = rec.sheet != 'Career Console' and not rec.official and not rec.agency and best != 'employer' and not ended %}
+{%- set look_on_linkedin = find_on_site and best != 'linkedin' %}
+{%- if rec.links or find_on_site or also %}
+<div class="rec-links">
+  {%- if find_on_site %}
+  <a class="btn solid" href="{{ employer_search(rec.company, rec.role) }}" target="_blank" rel="noopener noreferrer"
+     title="A web search for this job on {{ rec.company }}'s own site or ATS, LinkedIn and job boards left out. You open it in your browser">Find on {{ rec.company.split(' / ')[0] }}'s site ↗</a>
+  {%- endif %}
+  {%- for u in rec.links[:4] %}
+  <a class="badge n ghost" href="{{ u }}" target="_blank" rel="noopener noreferrer" title="{{ u }}">{{ link_label(u) }} ↗</a>
+  {%- endfor %}
+  {%- for o in also %}
+  <a class="badge n ghost" href="{{ o.url }}" target="_blank" rel="noopener noreferrer" title="The same position from another alert: {{ o.url }}">also: {{ o.location or link_label(o.url) }} ↗</a>
+  {%- endfor %}
+  {%- if look_on_linkedin %}
+  <a class="badge n ghost" href="{{ linkedin_search(rec.company, rec.role) }}" target="_blank" rel="noopener noreferrer"
+     title="Not found on the employer's official board: LinkedIn is the next best place to apply">Look for it on LinkedIn ↗</a>
+  {%- endif %}
+  <span class="fine">Best first: the employer’s own site or ATS → LinkedIn → a job board</span>
+</div>
+{%- endif %}
+{%- set contacts = contact_links(rec.company) if not ended else [] %}
+{%- if contacts %}
+<p class="fine rec-contacts">Possible contacts on LinkedIn:
+  {% for c in contacts %}<a class="link" href="{{ c.url }}" target="_blank" rel="noopener noreferrer" title="{{ c.title }} — a search you open yourself">{{ c.label }} ↗</a>{% if not loop.last %} · {% endif %}{% endfor %}</p>
+{%- endif %}
+{%- endmacro %}

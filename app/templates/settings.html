@@ -1,0 +1,122 @@
+{% extends "base.html" %}
+{% block title %}Search settings{% endblock %}
+{% block content %}
+<a class="back" href="/opportunities?tab=verified">← Verified Jobs</a>
+<div class="head">
+  <span class="kicker mono up">New Opportunities · settings</span>
+  <h1>What to look for</h1>
+  <p class="lead">Plain rules, no AI. A job is shown when its title has one of your search terms, has none of the excluded terms, and the location is Israel or open worldwide.</p>
+</div>
+
+{% if error %}<div class="callout" role="alert"><span class="t">Not saved</span><p>{{ error }}</p></div>{% endif %}
+{% if saved == 'links' %}<div class="callout info" role="status"><span class="t">Saved</span><p>Your links are kept only on this computer. A copy button is now at the top of every page.</p></div>{% endif %}
+<section class="section first" id="links">
+  <h2>Your links</h2>
+  <form class="panel settings" method="post" action="/opportunities/settings/links">
+    <p class="fine">For application forms: one click on the button at the top of any page copies the link. Kept only on this computer (next to the database), never in git, never sent anywhere.</p>
+    {%- for key, label in link_fields.items() %}
+    <label class="field">{{ label }}{% if key == 'linkedin' %} <small>e.g. https://www.linkedin.com/in/your-name/</small>{% endif %}
+      <input class="note-input" type="url" name="{{ key }}" maxlength="500" value="{{ links.get(key, '') }}" placeholder="https://"></label>
+    {%- endfor %}
+    <div><button class="btn solid" type="submit">Save links</button></div>
+  </form>
+</section>
+<section class="section" id="mail">
+  <h2>Job-alert e-mails</h2>
+  <div class="panel settings">
+    <p class="fine">LinkedIn, AllJobs and Drushim send you job alerts; with every search the console reads them from your mailbox (the last {{ mail_days }} days) and shows the jobs under New Opportunities → From alerts. Employers' replies to your applications are read too: a confirmation sets the record to Applied, a no to Rejected by them (listed under From alerts → Replies). The mailbox is opened read-only: nothing is marked, moved or deleted.</p>
+    {% if saved == 'mail' %}<div class="callout info" role="status"><span class="t">Mailbox saved</span><p>Press “Check mail now” on the From alerts tab, or wait for the next search.</p></div>{% endif %}
+    {% if saved == 'mail_removed' %}<div class="callout info" role="status"><span class="t">Mailbox removed</span><p>Its app password is deleted from this computer. Revoke it in your Google account too.</p></div>{% endif %}
+    {%- if mailboxes %}
+    <ul class="mail-held">
+      {%- for address in mailboxes %}{% set r = mail_reads.get(address) %}
+      <li><b>{{ address }}</b>
+        {%- if r %}<span class="badge {{ 'pr' if r.ok else 'hu' }}"><i></i>{{ 'read' if r.ok else 'failed' }} {{ r.read_at_utc|local_time }}</span>{% if not r.ok %}<span class="fine">{{ r.error }}</span>{% endif %}
+        {%- else %}<span class="badge n"><i></i>not checked yet</span>{% endif %}
+        <form method="post" action="/opportunities/settings/mail"><button class="btn quiet" type="submit" name="remove" value="{{ address }}">Remove</button></form></li>
+      {%- endfor %}
+    </ul>
+    {%- endif %}
+    <form method="post" action="/opportunities/settings/mail" class="settings" autocomplete="off">
+      <div class="settings-row">
+        <label class="field">E-mail address<input class="note-input" type="email" name="address" required placeholder="you@gmail.com" autocomplete="off"></label>
+        <label class="field">App password <small>not your normal password</small><input class="note-input" type="password" name="password" required autocomplete="new-password" placeholder="16 letters"></label>
+      </div>
+      <p class="fine">Create the app password once: turn on 2-Step Verification at myaccount.google.com/security, then create one named “Career Console” at myaccount.google.com/apppasswords. It is saved only on this computer (data/mail.env, readable by you only), never shown again and never in git. Mail forwarded into this Gmail from your other addresses is read too; a separate mailbox needs its own line.</p>
+      <div><button class="btn solid" type="submit">{{ 'Add another mailbox' if mailboxes else 'Connect mailbox' }}</button></div>
+    </form>
+  </div>
+</section>
+
+{% if saved == 'profile' %}<div class="callout info" role="status"><span class="t">Saved</span><p>New settings apply right away, also to postings already found. Earlier versions are kept ({{ versions }} so far).</p></div>{% endif %}
+{% if saved == 'source' %}<div class="callout info" role="status"><span class="t">Board added</span><p>It will be checked in the next search.</p></div>{% endif %}
+
+<section class="section">
+  <form class="panel settings" method="post" action="/opportunities/settings/profile">
+    <label class="field">Search terms <small>one per line · title must contain at least one (Hebrew and Russian work too)</small>
+      <textarea name="include_terms" rows="8" dir="auto">{{ profile.include_terms|join('\n') }}</textarea></label>
+    <label class="field">Excluded terms <small>one per line · a title with any of these is not shown (kept in Diagnostics)</small>
+      <textarea name="exclude_terms" rows="8" dir="auto">{{ profile.exclude_terms|join('\n') }}</textarea></label>
+    <fieldset class="field regions"><legend>Regions <small>untick the regions too far for you: a job whose places are all there is held back (a job in several places, or just “Israel”, never is)</small></legend>
+      <input type="hidden" name="regions_form" value="1">
+      {%- for key, (label, places) in regions.items() %}
+      <label class="check" title="{{ places[:12]|join(', ') }}…"><input type="checkbox" name="regions" value="{{ key }}"{% if key not in (profile.exclude_regions or []) %} checked{% endif %}> {{ label }}</label>
+      {%- endfor %}
+    </fieldset>
+    <label class="field">Places <small>one per line · single places too far for you, beyond the regions above</small>
+      <textarea name="exclude_places" rows="3" dir="auto">{{ (profile.exclude_places or [])|join('\n') }}</textarea></label>
+    <label class="field">Low-priority terms <small>marked, not hidden</small>
+      <textarea name="low_priority_terms" rows="4" dir="auto">{{ profile.low_priority_terms|join('\n') }}</textarea></label>
+    <label class="field">Excluded by the description <small>one per line · medical-device regulation (FDA, MDR, ISO 13485) and manufacturing quality (SPC, 8D, FMEA). A job is hidden when its description mentions at least the number below; fewer mentions are only marked</small>
+      <textarea name="exclude_description_terms" rows="6" dir="auto">{{ profile.exclude_description_terms|join('\n') }}</textarea></label>
+    <label class="field">Staffing agencies and contractors <small>one per line · matched inside the company name. For them a job is its title plus its job ID, so a title match alone never hides a job. Job IDs are kept and shown for every company</small>
+      <textarea name="agency_companies" rows="6" dir="auto">{{ profile.agency_companies|join('\n') }}</textarea></label>
+    <label class="field">Your level <small>one per line · titles with these words are listed first and marked “Lead role”; others are marked “engineer role”. Nothing is hidden for its level</small>
+      <textarea name="focus_level_terms" rows="4" dir="auto">{{ profile.focus_level_terms|join('\n') }}</textarea></label>
+    <label class="field">Above your level <small>one per line · marked “above your level”, listed last, never hidden</small>
+      <textarea name="above_level_terms" rows="3" dir="auto">{{ profile.above_level_terms|join('\n') }}</textarea></label>
+    <label class="field">Junior level <small>one per line · marked “junior role”, listed after engineer roles; a junior and a senior version of one ad are never merged</small>
+      <textarea name="junior_level_terms" rows="3" dir="auto">{{ profile.junior_level_terms|join('\n') }}</textarea></label>
+    <label class="field">Overqualified: a job asking at most this many years <small>of QA / engineering experience is marked “likely overqualified” (mid-level, below you). Years asked for management or leadership do not count. Never hidden</small>
+      <input class="note-input" type="number" name="overqualified_max_years" min="0" max="30" value="{{ profile.overqualified_max_years }}"></label>
+    <label class="field">Software roles <small>one per line · a title with any of these is a software role: regulatory terms in its description are only marked, never a reason to hide it (medicine is fine, medical devices are not)</small>
+      <textarea name="software_title_terms" rows="4" dir="auto">{{ profile.software_title_terms|join('\n') }}</textarea></label>
+    <label class="field">Hide when the description mentions at least
+      <input class="note-input" type="number" name="description_min_hits" min="1" max="20" value="{{ profile.description_min_hits }}"></label>
+    <div class="settings-row">
+      <label class="field">Fresh up to (days)<input class="note-input" type="number" name="fresh_days" min="1" max="365" value="{{ profile.fresh_days }}"></label>
+      <label class="field">Show jobs published within (days) <small>older ones are kept, and shown again only if the employer publishes them again</small>
+        <input class="note-input" type="number" name="max_age_days" min="1" max="365" value="{{ profile.max_age_days }}"></label>
+    </div>
+    <p class="fine">Location rule is fixed: Israel, or remote explicitly worldwide. Unclear locations go to “Needs geo review”; locations outside Israel are hidden with the reason kept.</p>
+    <div><button class="btn solid" type="submit">Save settings</button></div>
+  </form>
+</section>
+
+<section class="section" id="sources">
+  <h2>Official job boards <span class="count">{{ sources|selectattr('s.enabled')|list|length }} on</span></h2>
+  <form class="panel add-source" method="post" action="/opportunities/sources">
+    <label class="field">Job or board link <small>Greenhouse, Lever, Ashby or Comeet</small>
+      <input class="note-input" type="url" name="link" required placeholder="https://boards.greenhouse.io/company/jobs/123"></label>
+    <label class="field">Company<input class="note-input" type="text" name="company" maxlength="120" placeholder="Company name" dir="auto"></label>
+    <button class="btn solid" type="submit">Add board</button>
+  </form>
+  <div class="panel rows sources">
+    {% for row in sources %}{% set s = row.s %}
+    <div class="row-item" id="source-{{ s.id }}">
+      <div class="l">
+        <span class="co wrap" dir="auto">{{ s.company }}{% if not s.enabled %} <span class="tag">off</span>{% endif %}</span>
+        <span class="mono mut">{{ provider_names.get(s.provider, s.provider) }} · {{ s.board }} · {{ s.origin }}</span>
+        {% if row.last %}<span class="mono mut">last check {{ row.last.checked_at_utc|local_time }} ·
+          {% if row.last.ok %}ok{% else %}<span class="hu-text">{{ row.last.error }}</span>{% endif %}</span>{% endif %}
+      </div>
+      <form class="r" method="post" action="/opportunities/sources/{{ s.id }}/toggle">
+        <input type="hidden" name="enabled" value="{{ '0' if s.enabled else '1' }}">
+        <button class="btn" type="submit">{{ 'Turn off' if s.enabled else 'Turn on' }}</button>
+      </form>
+    </div>
+    {% else %}<p class="mut">No boards yet. Paste a job link from an employer’s official careers page above.</p>{% endfor %}
+  </div>
+  <p class="fine">Only these official boards are contacted, once per search (boards checked in the last 10 minutes are skipped). LinkedIn is never scraped: LinkedIn posts belong in Potential Leads, added by hand.</p>
+</section>
+{% endblock %}

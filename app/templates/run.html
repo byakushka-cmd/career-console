@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% block title %}Search run {{ run.id }}{% endblock %}
+{% macro cand_list(items, reason_key) -%}
+<div class="rows fold-body">
+  {%- for c in items %}
+  <div class="row-item"><div class="l">
+    <a class="co wrap" href="{{ c.url }}" target="_blank" rel="noopener noreferrer" dir="auto">{{ c.company }} — {{ c.title }}</a>
+    <span class="mut sm" dir="auto">{{ c.location or 'no location' }} · {{ c.reasons[reason_key] }}</span>
+  </div></div>
+  {%- else %}<p class="mut">None.</p>{% endfor %}
+</div>
+{%- endmacro %}
+{% block content %}
+<a class="back" href="/diagnostics#runs">← Diagnostics</a>
+<div class="head">
+  <span class="kicker mono up">Search run {{ run.id }} · {{ run.trigger }}</span>
+  <h1>{{ run.started_at_utc|local_time }}</h1>
+  <p class="lead">Every posting found is listed here with the reason it was or was not shown. Nothing was discarded before being logged.</p>
+</div>
+
+<div class="stats">
+  <div class="stat"><small>Boards checked</small><b>{{ run.sources_ok }}</b><small>{{ run.sources_failed }} failed</small></div>
+  <div class="stat"><small>Postings seen</small><b>{{ run.postings_seen }}</b><small>{{ run.postings_new }} new to us</small></div>
+  <div class="stat"><small>Shown as verified</small><b>{{ run.presented }}</b><small>at the time of this run</small></div>
+  <div class="stat"><small>Cost</small><b>${{ '%.2f'|format(cost.usd) }}</b><small>{{ cost.requests }} free requests · 0 paid</small></div>
+</div>
+
+<section class="section">
+  <h2>Boards</h2>
+  <div class="panel rows">
+    {% for c in checks %}
+    <div class="row-item"><div class="l"><span class="co wrap" dir="auto">{{ c.company }}</span>
+      <span class="mono mut">{{ provider_names.get(c.provider, c.provider) }} · {{ c.board }} · {{ c.duration_ms }} ms</span></div>
+      <div class="r">{% if c.ok %}<span class="badge pr"><i></i>{{ c.postings }} postings</span>{% else %}<span class="badge hu" title="{{ c.error }}"><i></i>{{ c.error[:40] }}</span>{% endif %}</div></div>
+    {% else %}<p class="mut">All boards were checked within the last hour; nothing fetched.</p>{% endfor %}
+  </div>
+  <p class="fine">A failed check (for example HTTP 403) means the board could not be read. It is never treated as the job closing.</p>
+</section>
+
+{% for key, title, reason in [('presented', 'Shown as verified jobs', 'relevance'), ('geo_review', 'Needs geo review', 'geo'),
+                              ('outside', 'Hidden: outside Israel', 'geo'), ('history', 'Already in your tracker', 'dedup'),
+                              ('excluded', 'Hidden: excluded terms', 'relevance')] %}
+<section class="section">
+  <details class="panel fold"{% if key in ('geo_review',) and funnel[key] %} open{% endif %}>
+    <summary><h2>{{ title }} <span class="count">{{ funnel[key]|length }}</span></h2></summary>
+    {{ cand_list(funnel[key], reason) }}
+  </details>
+</section>
+{% endfor %}
+<p class="fine">{{ no_match }} of {{ total }} postings had none of your search terms in the title (for example sales, finance or backend roles).</p>
+{% endblock %}

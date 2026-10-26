@@ -1,0 +1,159 @@
+{% extends "base.html" %}
+{% from "_macros.html" import state_badge, review_item %}
+{% block title %}Diagnostics{% endblock %}
+{% block content %}
+<div class="head">
+  <span class="kicker mono up">Search runs &amp; diagnostics</span>
+  <h1>Data health and review queue</h1>
+  <p class="lead">What was imported, whether it is intact, and what needs your decision. Decisions are logged here; the original Google Sheet is never changed.</p>
+</div>
+
+<div class="stats">
+  <div class="stat"><small>Tracker records</small><b>{{ stats.master }}</b><small>+ {{ stats.comeet }} Comeet index</small></div>
+  <div class="stat"><small>Job identities</small><b>{{ stats.jobs }}</b><small>provisional, {{ stats.companies }} companies</small></div>
+  <div class="stat"><small>Application evidence</small><b>{{ stats.applications }}</b><small>rows, not confirmed submissions</small></div>
+  <a class="stat" href="#review"><small>Needs your decision</small><b>{{ queue.decide|length }}</b><small>{{ queue.done|length }} resolved · {{ queue.info|length }} info</small></a>
+</div>
+
+<section class="section">
+  <h2>Database health</h2>
+  <div class="panel checks">
+    <div class="row-item"><span>SQLite integrity check</span><span class="badge {{ 'pr' if integrity == 'ok' else 'hu' }}"><i></i>{{ integrity }}</span></div>
+    <div class="row-item"><span>Foreign-key violations</span><span class="badge {{ 'pr' if fk_violations == 0 else 'hu' }}"><i></i>{{ fk_violations }}</span></div>
+    <div class="row-item"><span>Schema version</span><span class="badge {{ 'pr' if schema_version == latest_version else 'hu' }}"><i></i>v{{ schema_version }} of v{{ latest_version }}</span></div>
+    <div class="row-item"><span>Journal mode</span><span class="badge n"><i></i>{{ journal }}</span></div>
+    <div class="row-item"><span>Original rows stored verbatim</span><span class="badge n"><i></i>{{ stats.legacy }} incl. headers</span></div>
+  </div>
+</section>
+
+<section class="section" id="review">
+  <h2>Needs your decision <span class="count">{{ queue.decide|length }}</span></h2>
+  {% if queue.decide %}
+  <div class="rlist">{% for i in queue.decide %}{{ review_item(i, by_id, '/diagnostics') }}{% endfor %}</div>
+  {% else %}
+  <div class="panel empty"><span class="badge pr"><i></i>All clear</span><p>Nothing is waiting for a decision.</p></div>
+  {% endif %}
+  <p class="fine">Every decision is added to a log; nothing is overwritten, merged or deleted. {{ decisions_logged }} decision(s) logged so far.</p>
+</section>
+
+<section class="section">
+  <details class="panel fold"{% if request.query_params.get('open') == 'info' %} open{% endif %}>
+    <summary><h2>For information <span class="count">{{ queue.info|length }}</span></h2></summary>
+    <p class="fine">Auto-linked requisitions and informational notes. Confirm or correct them when convenient.</p>
+    <div class="rlist fold-body">{% for i in queue.info %}{{ review_item(i, by_id, '/diagnostics') }}{% endfor %}</div>
+  </details>
+</section>
+
+<section class="section">
+  <details class="panel fold"{% if request.query_params.get('open') == 'done' %} open{% endif %}>
+    <summary><h2>Resolved <span class="count">{{ queue.done|length }}</span></h2></summary>
+    <div class="rlist fold-body">
+      {% for i in queue.done %}{{ review_item(i, by_id, '/diagnostics') }}{% else %}<p class="mut">Nothing resolved yet.</p>{% endfor %}
+    </div>
+  </details>
+</section>
+
+<section class="section" id="runs">
+  <h2>Search runs <span class="count">{{ runs|length }}</span></h2>
+  {% if runs %}
+  <div class="panel rows">
+    {% for r in runs %}
+    <a class="row-item" href="/diagnostics/runs/{{ r.id }}">
+      <div class="l">
+        <span class="co wrap">{{ r.started_at_utc|local_time }} <span class="mut sm">· {{ r.trigger }}</span></span>
+        <span class="mono mut">{{ r.sources_ok }} boards ok{% if r.sources_failed %}, {{ r.sources_failed }} failed{% endif %} · {{ r.postings_seen }} seen · {{ r.postings_new }} new · {{ r.presented }} shown · ${{ '%.2f'|format(r.cost_usd) }}</span>
+      </div>
+      <div class="r"><span class="badge {{ 'pr' if r.status == 'finished' else ('ai' if r.status == 'running' else 'hu') }}"><i></i>{{ r.status }}</span></div>
+    </a>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div class="panel empty"><p>No search runs yet. Start one from New Opportunities → Verified Jobs, or run <span class="mono">career-console search</span>.</p></div>
+  {% endif %}
+  <p class="fine">Searches run only while this computer is on. Paid calls so far: none.</p>
+</section>
+
+<section class="section" id="feedback">
+  <h2>Search feedback <span class="count">{{ feedback.judged }} judged</span></h2>
+  <div class="stats">
+    <div class="stat"><small>Good finds — applied</small><b>{{ feedback.counts.applied_now }}</b><small>{% if feedback.good_share is not none %}{{ feedback.good_share }}% of judged jobs{% else %}none judged yet{% endif %}</small></div>
+    <div class="stat"><small>Not for me</small><b>{{ feedback.counts.declined }}</b><small>right kind of job, your choice{% if feedback.right_share is not none %} · search right {{ feedback.right_share }}%{% endif %}</small></div>
+    <div class="stat"><small>Duplicates</small><b>{{ feedback.counts.already_applied }}</b><small>seen already: the search missed them</small></div>
+    <div class="stat"><small>Wrong match</small><b>{{ feedback.counts.skipped }}</b><small>the search should not have brought it</small></div>
+    <div class="stat"><small>Overqualified</small><b>{{ feedback.counts.overqualified }}</b><small>your mark: below your level</small></div>
+    <div class="stat"><small>Saved / maybe</small><b>{{ feedback.counts.saved + feedback.counts.maybe }}</b><small>still open</small></div>
+  </div>
+  {% if feedback.reasons %}
+  <h3 class="fine">Wrong match: what to tighten</h3>
+  <div class="panel rows fold-body">
+    {% for reason, n in feedback.reasons %}<div class="row-item"><span dir="auto">{{ reason }}</span><span class="mono mut">{{ n }}</span></div>{% endfor %}
+  </div>
+  {% endif %}
+  {% if feedback.mine %}
+  <h3 class="fine">Not for me: your reasons</h3>
+  <div class="panel rows fold-body">
+    {% for reason, n in feedback.mine %}<div class="row-item"><span dir="auto">{{ reason }}</span><span class="mono mut">{{ n }}</span></div>{% endfor %}
+  </div>
+  {% endif %}
+  <details class="panel fold fold-body">
+    <summary><h2>Your notes <span class="count">{{ feedback.notes|length }}</span></h2></summary>
+    <div class="rows fold-body">
+      {% for n in feedback.notes %}
+      <a class="row-item" href="/postings/{{ n.posting_id }}"><div class="l">
+        <span dir="auto">{{ n.note }}</span>
+        <span class="mono mut">{{ n.created_at_utc|local_time }} · {{ posting_decisions.get(n.decision, n.decision) }} · {{ n.company }} — {{ n.title }}</span>
+      </div></a>
+      {% else %}<p class="mut">No notes yet. Write them on any card in Verified Jobs.</p>{% endfor %}
+    </div>
+  </details>
+  <p class="fine">Built only from your own decisions. “Duplicate” means the search brought back something you had already seen: those cases are used to improve duplicate detection.</p>
+</section>
+
+<section class="section" id="leads">
+  <h2>Potential Leads gate <span class="count">{{ lead_lists.shown|length + lead_lists.geo_review|length + lead_lists.outside|length + lead_lists.hidden|length }}</span></h2>
+  <div class="panel rows">
+    <div class="row-item"><span>Shown (Israel, worldwide remote, or confirmed by you)</span><span class="badge pr"><i></i>{{ lead_lists.shown|length }}</span></div>
+    <a class="row-item" href="/opportunities?tab=leads#leads"><span>Needs geo review</span><span class="badge {{ 'hu' if lead_lists.geo_review else 'n' }}"><i></i>{{ lead_lists.geo_review|length }}</span></a>
+    {% for v in lead_lists.outside %}
+    <div class="row-item"><div class="l"><span class="co wrap" dir="auto">{{ v.lead.role_signal or 'Role not stated' }}{% if v.lead.company %} — {{ v.lead.company }}{% endif %}</span>
+      <span class="mut sm">Not shown: {{ v.geo.reason }}</span></div><div class="r"><span class="badge n"><i></i>outside Israel</span></div></div>
+    {% endfor %}
+  </div>
+  <p class="fine">Only where the job is counts. A recruiter in Israel posting a US-only role is kept here with the reason, not shown as a lead.</p>
+</section>
+
+<section class="section">
+  <details class="panel fold">
+    <summary><h2>Screening rules <span class="count">{{ rules|length }}</span></h2></summary>
+    <div class="rows fold-body">
+      {% for r in rules %}
+      <div class="row-item"><div class="l"><span class="co wrap">{{ r.rule_name }}</span><span class="mut sm">{{ r.guidance }}</span></div></div>
+      {% endfor %}
+    </div>
+  </details>
+</section>
+
+<section class="section">
+  <details class="panel fold">
+    <summary><h2>Status mapping <span class="count">{{ mapping|length }} texts</span></h2></summary>
+    <p class="fine">How each original Status text was read. Baseline from the Phase 2 rules; your original text is never changed.</p>
+    <div class="rows fold-body">
+      {% for (raw, state), n in mapping %}
+      <div class="row-item"><span dir="auto">{{ raw or '— (empty)' }}</span><span class="r"><span class="mono mut">{{ n }}</span>{{ state_badge(state) }}</span></div>
+      {% endfor %}
+    </div>
+  </details>
+</section>
+
+<section class="section">
+  <h2>Snapshot provenance</h2>
+  <div class="panel prov">
+    <span><b>File</b> {{ snapshot.file_name }} ({{ snapshot.size_bytes }} bytes)</span>
+    <span><b>SHA-256</b> {{ snapshot.sha256 }}</span>
+    <span><b>Source last modified</b> {{ snapshot.source_last_modified_utc }} (source timezone {{ snapshot.source_timezone }})</span>
+    <span><b>Exported</b> {{ snapshot.exported_at_utc }}</span>
+    {% if batch %}<span><b>Imported</b> {{ batch.finished_at_utc|local_time }} Israel time · {{ batch.tool }}</span>{% endif %}
+    <span><b>Summary sheet</b> precomputed aggregate in the source; stored for provenance, never used for counts</span>
+  </div>
+</section>
+{% endblock %}

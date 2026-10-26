@@ -1,0 +1,118 @@
+{% extends "base.html" %}
+{% from "_macros.html" import state_badge, record_row, review_item, official_links, status_panel, apply_links %}
+{% block title %}{{ rec.company }} — {{ rec.role }}{% endblock %}
+{% block content %}
+<a class="back" href="{{ back }}">{{ '← My Pipeline' if back.startswith('/pipeline') else '← Back to the job' }}</a>
+<div class="head">
+  <span class="kicker mono up">{{ rec.sheet }} · row {{ rec.row }}</span>
+  <h1 dir="auto">{{ rec.role }}</h1>
+  <p class="sub" dir="auto">{{ rec.company }}</p>
+  <div class="title-badges">
+    {{ state_badge(rec.state, rec.label) }}
+    {% if rec.group_size > 1 %}<span class="badge ai ghost"><i></i>Same requisition in {{ rec.group_size }} rows</span>{% endif %}
+    {% if rec.applied %}<span class="badge n ghost">Applied {{ rec.applied }}</span>{% endif %}
+  </div>
+  {{ apply_links(rec) }}
+</div>
+
+{% if rec.lead_here %}
+<section class="section" id="lead-here">
+  <h2>Applied here as a lead <span class="count">{{ rec.lead_here|length }}</span></h2>
+  <p class="lead mb">You applied through {{ rec.company.split(' / ')[0] }} at your level. Your rule: not again through the same agency as an engineer, since the recruiter would see a step down.</p>
+  <div class="list">{% for r in rec.lead_here %}{{ record_row(r, back=back) }}{% endfor %}</div>
+</section>
+{% endif %}
+
+{% if rec.possibly_same %}
+<section class="section" id="possibly-same">
+  <h2>Possibly the same position <span class="count">{{ rec.possibly_same|length }}</span></h2>
+  <p class="lead mb">The same level through another recruiter or source, with the same end client or the same rare requirements. Nothing is merged: compare what each one told you (conditions, salary, stage).</p>
+  <div class="list">{% for r, why in rec.possibly_same %}{{ record_row(r, back=back) }}<p class="fine why">{{ r.ref }}: {{ why }}</p>{% endfor %}</div>
+</section>
+{% endif %}
+
+{{ status_panel(rec, back, status_history) }}
+
+{% if items %}
+<section class="section first">
+  <h2>Review <span class="count">{{ items|length }}</span></h2>
+  <div class="rlist">{% for i in items %}{{ review_item(i, by_id, '/records/' ~ rec.id, show_rows=i.kind == 'duplicate_review') }}{% endfor %}</div>
+</section>
+{% endif %}
+
+{% if linked %}
+<section class="section">
+  <h2>Linked observations <span class="count">{{ linked|length }}</span></h2>
+  <p class="lead mb">Matched by a shared official ID or an explicit row pointer. Each row is kept; nothing was merged away.</p>
+  <div class="list">{% for r in linked %}{{ record_row(r) }}{% endfor %}</div>
+</section>
+{% endif %}
+
+<section class="section">
+  <h2>Original record</h2>
+  <div class="panel">
+    <dl class="dl">
+      {% for f in fields %}
+      <div>
+        <dt>{{ f.name }}</dt>
+        {% if not f.text %}<dd class="empty">—</dd>
+        {% elif f.date %}<dd><span class="mono">{{ f.date }}</span><span class="note">stored as spreadsheet date {{ f.text }}</span></dd>
+        {% elif f.is_url %}<dd><a href="{{ f.text }}" target="_blank" rel="noopener noreferrer">{{ f.text }}</a></dd>
+        {% else %}<dd dir="auto">{{ f.text }}{% if f.not_a_date %}<span class="note hu">Expected a date here — text kept as-is, not shifted.</span>{% endif %}</dd>
+        {% endif %}
+      </div>
+      {% endfor %}
+    </dl>
+  </div>
+</section>
+
+{% if applications or events %}
+<section class="section">
+  <h2>Application evidence</h2>
+  <div class="panel rows">
+    {% for a in applications %}
+    <div class="row-item">
+      <div class="l">
+        <span>{{ a.current_status_raw or '—' }}</span>
+        <span class="mono mut">{{ a.application_type }} · applied {{ a.applied_on or 'date not recorded' }}</span>
+      </div>
+      <div class="r">{{ state_badge(a.state) }}{% if a.review_required %}<span class="tag hu">to confirm</span>{% endif %}</div>
+    </div>
+    {% endfor %}
+    {% for e in events %}
+    <div class="row-item">
+      <div class="l">
+        <span dir="auto">{{ e.event_text or 'No history text in the tracker.' }}</span>
+        <span class="mono mut">{{ e.event_time or 'no date' }} · {{ e.provenance }}</span>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  <p class="fine">One evidence row per tracker row. This is not a count of confirmed, distinct applications.</p>
+</section>
+{% endif %}
+
+{% if contacts %}
+<section class="section">
+  <h2>Contacts mentioned</h2>
+  <div class="panel rows">
+    {% for c in contacts %}
+    <div class="row-item">
+      <div class="l"><span dir="auto">{{ c.raw_contact }}</span>{% if c.display_name %}<span class="mono mut">person record: {{ c.display_name }} · needs review</span>{% endif %}</div>
+    </div>
+    {% endfor %}
+  </div>
+</section>
+{% endif %}
+
+<section class="section">
+  <h2>Provenance</h2>
+  <div class="panel prov">
+    <span><b>Sheet</b> {{ rec.sheet }}, row {{ rec.row }}</span>
+    <span><b>Row SHA-256</b> {{ row_sha }}</span>
+    <span><b>Snapshot</b> {{ snapshot.file_name }}</span>
+    <span><b>Snapshot SHA-256</b> {{ snapshot.sha256 }}</span>
+    <span><b>Source timezone</b> {{ snapshot.source_timezone }} (date-only values are shown unshifted)</span>
+  </div>
+</section>
+{% endblock %}
