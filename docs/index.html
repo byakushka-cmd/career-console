@@ -3,179 +3,394 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Career Console</title>
+<title>Career Console — your job search, on your own computer</title>
+<meta name="description" content="A job-search console that runs on your own computer: new jobs from employers' official career sites and your alert e-mails, every application with its history, employers' replies read for you. No account, no cloud, no AI.">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 32 32%27%3E%3Crect x=%272%27 y=%272%27 width=%2728%27 height=%2728%27 rx=%278%27 fill=%27%23161A20%27/%3E%3Cpath d=%27M9 21l4.5-5 3.5 3 6-8%27 fill=%27none%27 stroke=%27%235FD8A9%27 stroke-width=%272.4%27 stroke-linecap=%27round%27 stroke-linejoin=%27round%27/%3E%3C/svg%3E">
-<meta name="description" content="A job-search console that runs on your own computer: new jobs from employers' career sites and your alert e-mails, every application with its history, employers' replies read for you.">
 <style>
+/* Colour carries one meaning each, as in the console itself:
+   green = verified / under way · amber = waiting on your decision · lavender = found by the search */
 :root{
-  --bg:#07080A; --panel:#101318; --panel-2:#161A20; --ink:#F3F4F6; --ink-2:#BCC1C9; --mut:#868C95;
-  --line:rgba(255,255,255,.08); --line-2:rgba(255,255,255,.14);
-  --ai:#A6AEFF; --ai-dim:rgba(166,174,255,.11); --pr:#5FD8A9; --pr-dim:rgba(95,216,169,.11);
+  --bg:#07080A; --bg-2:#0B0D10; --panel:#101318; --panel-2:#161A20; --raise:rgba(255,255,255,.03);
+  --ink:#F3F4F6; --ink-2:#BCC1C9; --mut:#868C95; --faint:#3B4048;
+  --line:rgba(255,255,255,.08); --line-2:rgba(255,255,255,.14); --line-top:rgba(255,255,255,.2);
+  --pr:#5FD8A9; --pr-dim:rgba(95,216,169,.11);
   --hu:#F4B860; --hu-dim:rgba(244,184,96,.11);
-  --sans:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --ai:#A6AEFF; --ai-dim:rgba(166,174,255,.11);
+  --btn-ink:#07080A;
+  --sans:-apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+  --display:-apple-system,BlinkMacSystemFont,"SF Pro Display","Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
   --mono:ui-monospace,"SF Mono",Menlo,"Roboto Mono",monospace;
+  --frame:1160px; --gut:24px; --r:14px;
   color-scheme:dark;
 }
 @media (prefers-color-scheme:light){
-  :root{--bg:#F6F6F4; --panel:#FFFFFF; --panel-2:#F1F2F4; --ink:#0D0F12; --ink-2:#3A4049; --mut:#5E656F;
-    --line:rgba(10,12,16,.09); --line-2:rgba(10,12,16,.15);
-    --ai:#4C55C7; --ai-dim:rgba(76,85,199,.08); --pr:#0E7A52; --pr-dim:rgba(14,122,82,.08);
-    --hu:#985700; --hu-dim:rgba(196,120,0,.1); color-scheme:light}
+  :root{
+    --bg:#F6F6F4; --bg-2:#EFEFEC; --panel:#FFFFFF; --panel-2:#F3F4F5; --raise:rgba(10,12,16,.02);
+    --ink:#0D0F12; --ink-2:#3A4049; --mut:#5E656F; --faint:#C9CDD3;
+    --line:rgba(10,12,16,.09); --line-2:rgba(10,12,16,.15); --line-top:rgba(255,255,255,1);
+    --pr:#0E7A52; --pr-dim:rgba(14,122,82,.08);
+    --hu:#985700; --hu-dim:rgba(196,120,0,.1);
+    --ai:#4C55C7; --ai-dim:rgba(76,85,199,.08);
+    --btn-ink:#FFFFFF;
+    color-scheme:light;
+  }
 }
 *{box-sizing:border-box}
-html{-webkit-text-size-adjust:100%}
-body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.6 var(--sans)}
-a{color:inherit}
-.wrap{max-width:1040px;margin:0 auto;padding:0 20px}
-header.top{display:flex;align-items:center;justify-content:space-between;padding-top:20px;padding-bottom:20px;border-bottom:1px solid var(--line)}
-.brand{display:flex;align-items:center;gap:10px;font-weight:600;letter-spacing:-.01em;text-decoration:none}
-.brand svg{width:26px;height:26px}
-.top nav a{color:var(--ink-2);text-decoration:none;margin-left:20px;font-size:15px}
-.top nav a:hover{color:var(--ink)}
-.hero{padding-top:72px;padding-bottom:40px}
-.kicker{font:500 12px/1 var(--mono);letter-spacing:.12em;text-transform:uppercase;color:var(--mut)}
-h1{font-size:clamp(34px,6vw,56px);line-height:1.05;letter-spacing:-.035em;margin:14px 0 18px;max-width:16ch}
-.lead{font-size:19px;color:var(--ink-2);max-width:62ch;margin:0}
-.badges{display:flex;flex-wrap:wrap;gap:8px;margin:26px 0 0;padding:0;list-style:none}
-.badge{display:inline-flex;align-items:center;gap:7px;font:500 13px/1 var(--sans);padding:7px 11px;border-radius:999px;border:1px solid var(--line-2);color:var(--ink-2)}
-.badge i{width:7px;height:7px;border-radius:50%;background:currentColor}
-.badge.pr{color:var(--pr);background:var(--pr-dim);border-color:transparent}
-.badge.ai{color:var(--ai);background:var(--ai-dim);border-color:transparent}
-.badge.hu{color:var(--hu);background:var(--hu-dim);border-color:transparent}
-.install{margin:40px 0 0;background:var(--panel);border:1px solid var(--line-2);border-radius:14px;padding:22px}
-.install h2{font-size:15px;margin:0 0 12px;font-weight:600}
-.cmd{display:flex;gap:10px;align-items:stretch}
-.cmd code{flex:1;min-width:0;overflow-x:auto;white-space:nowrap;background:var(--panel-2);border:1px solid var(--line);border-radius:10px;padding:13px 14px;font:14px/1.4 var(--mono);color:var(--ink)}
-.cmd button{flex:none;font:600 14px var(--sans);color:var(--bg);background:var(--pr);border:0;border-radius:10px;padding:0 18px;cursor:pointer}
-.cmd button:focus-visible{outline:2px solid var(--ai);outline-offset:2px}
-.install p{margin:12px 0 0;color:var(--mut);font-size:14px}
-section{padding:56px 0;border-top:1px solid var(--line)}
-section h2{font-size:28px;letter-spacing:-.025em;margin:0 0 8px}
-section > .wrap > p.sub{color:var(--ink-2);margin:0 0 28px;max-width:62ch}
-.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:14px}
-.card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:20px}
-.card h3{font-size:17px;margin:12px 0 6px;letter-spacing:-.01em}
-.card p{margin:0;color:var(--ink-2);font-size:15px}
-.shot{margin:28px 0 0;border:1px solid var(--line-2);border-radius:14px;overflow:hidden;background:var(--panel)}
-.shot img{display:block;width:100%;height:auto}
-.shot figcaption{padding:10px 14px;color:var(--mut);font-size:13px;border-top:1px solid var(--line)}
-ol.steps{margin:0;padding:0;list-style:none;counter-reset:s;display:grid;gap:14px}
-ol.steps li{counter-increment:s;background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:18px 18px 18px 60px;position:relative}
-ol.steps li::before{content:counter(s);position:absolute;left:18px;top:17px;width:28px;height:28px;border-radius:50%;display:grid;place-items:center;font:600 14px var(--mono);background:var(--ai-dim);color:var(--ai)}
-ol.steps b{display:block;margin-bottom:2px}
-ol.steps span{color:var(--ink-2);font-size:15px}
-table{width:100%;border-collapse:collapse;font-size:15px}
-td{padding:11px 0;border-bottom:1px solid var(--line);vertical-align:top}
-td:first-child{width:220px;font-weight:600;padding-right:16px}
-td:last-child{color:var(--ink-2)}
-footer{padding-top:36px;padding-bottom:56px;border-top:1px solid var(--line);color:var(--mut);font-size:14px}
-@media (max-width:600px){
-  .hero{padding-top:44px;padding-bottom:28px}
-  .top nav a:not(:last-child){display:none}
-  .cmd{flex-direction:column}
-  .cmd button{padding:12px}
-  td:first-child{width:auto;display:block;padding-bottom:0;border:0}
-  td{display:block}
+html{-webkit-text-size-adjust:100%;scroll-behavior:smooth}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.6 var(--sans);-webkit-font-smoothing:antialiased;overflow-x:hidden}
+body::before{content:"";position:fixed;inset:0;pointer-events:none;z-index:0;opacity:.035;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")}
+main,header,footer{position:relative;z-index:1}
+a{color:inherit;text-decoration:none}
+a.u{background:linear-gradient(currentColor,currentColor) 0 100%/0 1px no-repeat;transition:background-size .25s}
+a.u:hover{background-size:100% 1px}
+:focus-visible{outline:2px solid var(--ai);outline-offset:3px;border-radius:6px}
+code{font:13.5px/1.4 var(--mono)}
+.wrap{max-width:var(--frame);margin:0 auto;padding-left:var(--gut);padding-right:var(--gut)}
+.kicker{font:500 12px/1.5 var(--mono);letter-spacing:.14em;text-transform:uppercase;color:var(--mut)}
+.dot{display:inline-block;width:7px;height:7px;border-radius:50%;background:currentColor;flex:none}
+
+/* header */
+.top{display:flex;align-items:center;justify-content:space-between;padding-top:18px;padding-bottom:18px}
+.brand{display:flex;align-items:center;gap:10px;font:600 16px/1 var(--display);letter-spacing:-.01em}
+.brand svg{width:28px;height:28px}
+.nav{display:flex;align-items:center;gap:26px;font-size:14.5px;color:var(--ink-2)}
+.nav a.u:hover{color:var(--ink)}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:40px;padding:0 16px;border-radius:10px;
+  font:600 14.5px/1 var(--sans);color:var(--ink);border:1px solid var(--line-2);background:var(--panel);box-shadow:inset 0 1px 0 var(--raise);transition:border-color .2s}
+.btn:hover{border-color:var(--ink-2)}
+
+/* hero */
+.hero{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,1fr);gap:56px;align-items:center;padding-top:64px;padding-bottom:96px}
+h1{font:600 clamp(36px,4.3vw,54px)/1.06 var(--display);letter-spacing:-.03em;margin:18px 0 20px}
+h1 em{font-style:normal;color:var(--pr)}
+.lead{font-size:19px;line-height:1.55;color:var(--ink-2);max-width:34em;margin:0}
+.install{margin-top:32px}
+.cmd{display:flex;align-items:stretch;border:1px solid var(--line-2);border-radius:12px;background:var(--panel);
+  box-shadow:inset 0 1px 0 var(--line-top);overflow:hidden;max-width:560px}
+.cmd .p{display:grid;place-items:center;padding:0 10px 0 14px;color:var(--pr);font:600 14px var(--mono)}
+.cmd code{flex:1;min-width:0;overflow-x:auto;white-space:nowrap;padding:14px 4px;color:var(--ink);scrollbar-width:none}
+.cmd code::-webkit-scrollbar{display:none}
+.cmd button{flex:none;min-width:84px;min-height:44px;border:0;border-left:1px solid var(--line);background:var(--panel-2);color:var(--ink);font:600 14px var(--sans);cursor:pointer}
+.cmd button:hover{color:var(--pr)}
+.note{margin:12px 0 0;font-size:14px;color:var(--mut);max-width:560px}
+.note a{color:var(--ink-2)}
+.facts{display:flex;flex-wrap:wrap;gap:8px 18px;margin:28px 0 0;padding:0;list-style:none;font-size:14px;color:var(--ink-2)}
+.facts li{display:flex;align-items:center;gap:8px}
+.g{color:var(--pr)} .a{color:var(--hu)} .l{color:var(--ai)}
+
+/* the console, drawn */
+.stage{position:relative}
+.stage::before{content:"";position:absolute;inset:8% -6% -4% 6%;background:radial-gradient(closest-side,var(--pr-dim),transparent);filter:blur(30px);z-index:-1}
+.win{border:1px solid var(--line-2);border-radius:16px;background:var(--bg-2);box-shadow:inset 0 1px 0 var(--line-top),0 30px 80px -40px rgba(0,0,0,.6);overflow:hidden}
+.bar{display:flex;align-items:center;gap:7px;padding:11px 14px;border-bottom:1px solid var(--line);background:var(--panel)}
+.bar i{width:10px;height:10px;border-radius:50%;background:var(--faint)}
+.bar span{margin-left:10px;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font:500 12px var(--mono);color:var(--mut)}
+.bar b{margin-left:auto;font:600 10.5px var(--mono);letter-spacing:.12em;color:var(--pr);display:flex;align-items:center;gap:6px}
+.ui{padding:16px}
+.tabs{display:flex;gap:6px;margin-bottom:12px}
+.tab{font:500 12.5px var(--sans);padding:6px 10px;border-radius:8px;color:var(--mut);border:1px solid transparent}
+.tab.on{color:var(--ink);background:var(--panel);border-color:var(--line-2)}
+.tab small{font:500 11px var(--mono);margin-left:5px;color:var(--mut)}
+.job{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:13px 14px;margin-top:8px;box-shadow:inset 0 1px 0 var(--raise)}
+.job .row{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
+.job .co{font-size:12px;color:var(--mut)}
+.job h4{margin:2px 0 8px;font:600 15px/1.25 var(--display);letter-spacing:-.01em}
+.job .go{flex:none;font:600 11.5px var(--sans);padding:7px 10px;border-radius:8px;background:var(--ink);color:var(--btn-ink);white-space:nowrap}
+.tags{display:flex;flex-wrap:wrap;gap:5px}
+.tag{display:inline-flex;align-items:center;gap:5px;font:500 11px/1 var(--sans);padding:5px 7px;border-radius:999px;border:1px solid var(--line-2);color:var(--ink-2)}
+.tag .dot{width:5px;height:5px}
+.tag.g{color:var(--pr);background:var(--pr-dim);border-color:transparent}
+.tag.a{color:var(--hu);background:var(--hu-dim);border-color:transparent}
+.tag.l{color:var(--ai);background:var(--ai-dim);border-color:transparent}
+.reply{display:flex;align-items:center;gap:10px;margin-top:10px;padding:10px 12px;border-radius:10px;border:1px dashed var(--line-2);font-size:12.5px;color:var(--ink-2)}
+.reply b{color:var(--ink);font-weight:600}
+.illus{position:absolute;right:4px;bottom:-26px;font:500 11px var(--mono);color:var(--mut)}
+@media (prefers-reduced-motion:no-preference){
+  .job,.reply{opacity:0;transform:translateY(8px);animation:in .6s cubic-bezier(.2,.7,.2,1) forwards}
+  .job:nth-of-type(1){animation-delay:.15s} .job:nth-of-type(2){animation-delay:.3s} .job:nth-of-type(3){animation-delay:.45s}
+  .reply{animation-delay:.7s}
+  @keyframes in{to{opacity:1;transform:none}}
+}
+
+/* sections */
+section{border-top:1px solid var(--line);padding-top:88px;padding-bottom:88px}
+.head{display:grid;grid-template-columns:200px minmax(0,1fr);gap:24px;margin-bottom:44px}
+.head .kicker{padding-top:10px}
+h2{font:600 clamp(28px,3.4vw,40px)/1.1 var(--display);letter-spacing:-.025em;margin:0 0 12px;max-width:20em}
+.head p{margin:0;color:var(--ink-2);font-size:17px;max-width:38em}
+
+/* how it works */
+.flow{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));border:1px solid var(--line);border-radius:var(--r);background:var(--panel);box-shadow:inset 0 1px 0 var(--line-top)}
+.step{padding:24px 22px 26px;border-left:1px solid var(--line);position:relative}
+.step:first-child{border-left:0}
+.step .n{font:500 12px var(--mono);color:var(--mut)}
+.step h3{display:flex;align-items:center;gap:9px;margin:14px 0 8px;font:600 18px/1.2 var(--display);letter-spacing:-.015em}
+.step p{margin:0;font-size:14.5px;color:var(--ink-2)}
+.step:not(:last-child)::after{content:"→";position:absolute;right:-10px;top:22px;z-index:1;width:20px;height:20px;display:grid;place-items:center;
+  font:12px var(--mono);color:var(--mut);background:var(--panel);border:1px solid var(--line-2);border-radius:50%}
+
+/* filters */
+.split{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:48px;align-items:start}
+.points{margin:0;padding:0;list-style:none;display:grid;gap:24px}
+.points li{display:grid;grid-template-columns:28px minmax(0,1fr);gap:12px}
+.points b{display:block;font:600 16px/1.3 var(--display);margin-bottom:3px}
+.points span{color:var(--ink-2);font-size:15px}
+.points i{font:500 12px var(--mono);font-style:normal;color:var(--mut);padding-top:2px}
+.panel{border:1px solid var(--line-2);border-radius:var(--r);background:var(--panel);box-shadow:inset 0 1px 0 var(--line-top);padding:6px 18px}
+.f{display:flex;align-items:center;gap:14px;padding:13px 0;border-bottom:1px solid var(--line);font-size:14.5px}
+.f:last-child{border-bottom:0}
+.f .t{flex:1;min-width:0}
+.f .t small{display:block;color:var(--mut);font-size:12.5px}
+.f .c{font:500 12.5px var(--mono);color:var(--hu)}
+.sw{flex:none;width:34px;height:20px;border-radius:999px;background:var(--pr);position:relative}
+.sw::after{content:"";position:absolute;top:3px;right:3px;width:14px;height:14px;border-radius:50%;background:var(--btn-ink)}
+.sw.off{background:var(--faint)} .sw.off::after{right:auto;left:3px;background:var(--ink-2)}
+.cap{margin:10px 2px 0;font:500 11.5px var(--mono);color:var(--mut)}
+
+/* real screens */
+.shots{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:20px}
+.shot{margin:0}
+.shot .win img{display:block;width:100%;height:auto}
+.shot figcaption{margin-top:12px;font-size:14px;color:var(--mut)}
+.shot figcaption b{color:var(--ink);font-weight:600}
+
+/* private */
+.spec{margin:0;border-top:1px solid var(--line)}
+.spec div{display:grid;grid-template-columns:240px minmax(0,1fr);gap:24px;padding:18px 0;border-bottom:1px solid var(--line)}
+.spec dt{font:600 15.5px/1.4 var(--display);margin:0}
+.spec dd{margin:0;color:var(--ink-2);font-size:15.5px}
+.spec code,.steps code{color:var(--ink);background:var(--panel-2);border:1px solid var(--line);border-radius:6px;padding:1px 6px;font-size:12.5px}
+
+/* start */
+.steps{margin:0;padding:0;list-style:none;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
+.steps li{border:1px solid var(--line);border-radius:var(--r);background:var(--panel);padding:20px 20px 22px;box-shadow:inset 0 1px 0 var(--raise)}
+.steps .n{font:500 12px var(--mono);color:var(--ai)}
+.steps h3{margin:10px 0 6px;font:600 17px/1.25 var(--display);letter-spacing:-.01em}
+.steps p{margin:0;color:var(--ink-2);font-size:15px}
+
+/* closing */
+.close{border-top:1px solid var(--line);padding-top:96px;padding-bottom:24px;display:flex;flex-direction:column;align-items:center;text-align:center}
+.close h2{margin:14px auto 12px}
+.close p{margin:0 auto 28px;color:var(--ink-2);max-width:34em}
+.close .cmd{width:100%;text-align:left}
+footer{border-top:1px solid var(--line);margin-top:72px;padding-top:28px}
+.foot{display:flex;flex-wrap:wrap;gap:12px 28px;justify-content:space-between;color:var(--mut);font-size:14px}
+.word{font:700 clamp(56px,12.5vw,168px)/.8 var(--display);letter-spacing:-.06em;color:transparent;-webkit-text-stroke:1px var(--line-2);
+  margin:40px 0 0;padding-bottom:12px;white-space:nowrap;overflow:hidden;user-select:none}
+
+/* 1024 and below */
+@media (max-width:920px){
+  .hero{grid-template-columns:minmax(0,1fr);gap:64px;padding-top:48px}
+  .stage{max-width:660px}
+}
+@media (max-width:1080px){
+  .hero{gap:36px}
+  .job .go{font-size:11px;padding:6px 8px}
+  .flow{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .step:nth-child(3){border-left:0}
+  .step:nth-child(n+3){border-top:1px solid var(--line)}
+  .step:nth-child(2)::after{display:none}
+  .split{grid-template-columns:minmax(0,1fr)}
+  .head{grid-template-columns:minmax(0,1fr);gap:10px}
+  .head .kicker{padding-top:0}
+}
+/* phones */
+@media (max-width:640px){
+  :root{--gut:18px}
+  .nav a.u{display:none}
+  .hero{padding-top:32px;padding-bottom:72px}
+  .lead{font-size:17px}
+  .stage::before{inset:8% 0 0 0}
+  .ui .job:nth-of-type(3){display:none}
+  .job .go{display:none}
+  .flow{grid-template-columns:minmax(0,1fr)}
+  .step{border-left:0}
+  .step:nth-child(n+2){border-top:1px solid var(--line)}
+  .step::after{display:none}
+  .shots,.steps{grid-template-columns:minmax(0,1fr)}
+  .spec div{grid-template-columns:minmax(0,1fr);gap:4px}
+  section,.close{padding-top:64px;padding-bottom:64px}
+  .cmd button{min-width:72px}
 }
 </style>
 </head>
 <body>
-<header class="top wrap">
-  <a class="brand" href="#">
+<header class="wrap top">
+  <a class="brand" href="#top" aria-label="Career Console, top of the page">
     <svg viewBox="0 0 32 32" aria-hidden="true"><rect x="2" y="2" width="28" height="28" rx="8" fill="var(--panel-2)" stroke="var(--line-2)"/><path d="M9 21l4.5-5 3.5 3 6-8" fill="none" stroke="var(--pr)" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
     Career Console
   </a>
-  <nav><a href="#features">What it does</a><a href="#start">First steps</a><a href="https://github.com/byakushka-cmd/career-console">Source</a></nav>
+  <nav class="nav" aria-label="Page">
+    <a class="u" href="#how">How it works</a>
+    <a class="u" href="#private">Privacy</a>
+    <a class="u" href="#start">First steps</a>
+    <a class="btn" href="https://github.com/byakushka-cmd/career-console">Source on GitHub</a>
+  </nav>
 </header>
 
-<main>
+<main id="top">
 <div class="wrap hero">
-  <span class="kicker">Job search · runs on your computer</span>
-  <h1>Your job search in one place, on your own computer</h1>
-  <p class="lead">New jobs from employers' official career sites and from your job-alert e-mails, every application with its
-    history, and employers' replies read for you. No account, no cloud, no AI, no subscription.</p>
-  <ul class="badges">
-    <li class="badge pr"><i></i>Your data stays on your computer</li>
-    <li class="badge ai"><i></i>Official career sites, every few hours</li>
-    <li class="badge hu"><i></i>Every rule visible, every rule can be turned off</li>
-  </ul>
-  <div class="install" id="install">
-    <h2>Install on a Mac: paste this into Terminal</h2>
-    <div class="cmd">
-      <code id="cmd">curl -fsSL https://raw.githubusercontent.com/byakushka-cmd/career-console/main/install.sh | bash</code>
-      <button type="button" id="copy">Copy</button>
+  <div>
+    <span class="kicker">Job search · runs on your computer</span>
+    <h1>Your job search,<br><em>on your own computer.</em></h1>
+    <p class="lead">New jobs from employers' official career sites and from your job-alert e-mails, every application with its
+      history, and the employers' replies read for you.</p>
+    <div class="install">
+      <div class="cmd">
+        <span class="p" aria-hidden="true">$</span>
+        <code id="cmd">curl -fsSL https://raw.githubusercontent.com/byakushka-cmd/career-console/main/install.sh | bash</code>
+        <button type="button" data-copy="cmd">Copy</button>
+      </div>
+      <p class="note">Paste it into Terminal on a Mac. A few minutes later three icons are on your desktop;
+        <b>Career Console</b> opens it from then on. Linux or Windows: <a class="u" href="https://github.com/byakushka-cmd/career-console#manual-install-linux-windows-or-without-the-script">manual install</a>.</p>
     </div>
-    <p>A few minutes the first time. It puts three icons on your desktop: <b>Career Console</b> opens it from then on.
-      Run the same line again to update; your data stays. Linux or Windows: <a href="https://github.com/byakushka-cmd/career-console#manual-install-linux-windows-or-without-the-script">manual install</a>.</p>
+    <ul class="facts">
+      <li><span class="dot g"></span>No account, no cloud</li>
+      <li><span class="dot l"></span>No AI, no paid services</li>
+      <li><span class="dot a"></span>Every rule visible</li>
+    </ul>
   </div>
+
+  <figure class="stage" style="margin:0" aria-label="An illustration of the console">
+    <div class="win">
+      <div class="bar"><i></i><i></i><i></i><span>127.0.0.1 · New Opportunities</span><b><span class="dot"></span>LOCAL</b></div>
+      <div class="ui">
+        <div class="tabs"><span class="tab on">Verified Jobs<small>3</small></span><span class="tab">From alerts<small>5</small></span><span class="tab">My Pipeline</span></div>
+        <div class="job">
+          <div class="row"><div><span class="co">Acme Cloud</span><h4>QA Team Lead</h4></div><span class="go">Apply · Acme's own form ↗</span></div>
+          <div class="tags"><span class="tag g"><span class="dot"></span>Israel · Tel Aviv</span><span class="tag g"><span class="dot"></span>Fresh · 1 day</span><span class="tag l"><span class="dot"></span>Lead role</span></div>
+        </div>
+        <div class="job">
+          <div class="row"><div><span class="co">Initech · from a LinkedIn alert</span><h4>Test Automation Lead</h4></div><span class="go">Find on Initech's site ↗</span></div>
+          <div class="tags"><span class="tag l"><span class="dot"></span>Lead role</span><span class="tag a"><span class="dot"></span>rejected here before</span><span class="tag">employer page first</span></div>
+        </div>
+        <div class="job">
+          <div class="row"><div><span class="co">Globex</span><h4>Senior QA Engineer, Payments</h4></div><span class="go">Apply · Globex's own form ↗</span></div>
+          <div class="tags"><span class="tag g"><span class="dot"></span>Israel · Herzliya</span><span class="tag">engineer role</span></div>
+        </div>
+        <div class="reply"><span class="tag a"><span class="dot"></span>Reply</span><span><b>Hooli</b> wrote back: status set to <b>Rejected by them</b></span></div>
+      </div>
+    </div>
+    <figcaption class="illus">Illustration · example companies</figcaption>
+  </figure>
 </div>
 
-<section id="features">
+<section id="how">
   <div class="wrap">
-    <h2>What it does</h2>
-    <p class="sub">Built for a job search in Israel: Hebrew and English titles, Israeli job boards, the regions of the country.</p>
-    <div class="grid">
-      <div class="card"><span class="badge ai"><i></i>New Opportunities</span>
-        <h3>Jobs from the employers themselves</h3>
-        <p>About a hundred official career sites (Greenhouse, Lever, Ashby, Comeet, Workday) checked every few hours. You see the jobs that match your terms, are in the regions you choose and are not in your list yet. Lead roles first.</p></div>
-      <div class="card"><span class="badge ai"><i></i>Alert e-mails</span>
-        <h3>LinkedIn, AllJobs and Drushim alerts</h3>
-        <p>Read from your own Gmail, read-only, and put through the same rules: no repeats of jobs you already know, the employer's own posting first.</p></div>
-      <div class="card"><span class="badge pr"><i></i>My Pipeline</span>
-        <h3>Every application with its history</h3>
-        <p>Status, notes and history for each application; lead roles and engineer roles apart. Add one in seconds: paste a link and a few words, or dictate them.</p></div>
-      <div class="card"><span class="badge pr"><i></i>Replies</span>
-        <h3>Confirmations and rejections, read for you</h3>
+    <div class="head"><span class="kicker">01 · How it works</span>
+      <div><h2>From a posting to a reply, in one place</h2>
+        <p>Every two hours the console looks for new jobs, puts them through your rules and keeps what you decide. You apply;
+          it keeps the record.</p></div></div>
+    <div class="flow">
+      <div class="step"><span class="n">01</span><h3><span class="dot l"></span>Find</h3>
+        <p>About a hundred official career sites (Greenhouse, Lever, Ashby, Comeet, Workday) and the alerts LinkedIn, AllJobs and Drushim send to your Gmail.</p></div>
+      <div class="step"><span class="n">02</span><h3><span class="dot a"></span>Filter</h3>
+        <p>Your search terms, your regions of Israel, your level. A job you already know never comes back as new.</p></div>
+      <div class="step"><span class="n">03</span><h3><span class="dot g"></span>Track</h3>
+        <p>One click puts a job in My Pipeline, with its link and history. Lead roles and engineer roles apart.</p></div>
+      <div class="step"><span class="n">04</span><h3><span class="dot g"></span>Hear back</h3>
         <p>"We got your application" marks it as sent; "we decided not to move forward" closes it. Your own later update always wins.</p></div>
-      <div class="card"><span class="badge hu"><i></i>Filters</span>
-        <h3>Nothing is hidden without a reason</h3>
-        <p>Excluded words, regions, junior positions, jobs you already know: each rule shows how many jobs it holds back and can be switched off.</p></div>
-      <div class="card"><span class="badge"><i></i>Private</span>
-        <h3>One folder on your computer</h3>
-        <p>Your database, settings and mailbox password stay in the console's <code>data</code> folder. It listens only on your computer and contacts only the career sites and your mailbox.</p></div>
     </div>
-    <figure class="shot"><img src="img/opportunities.png" alt="New Opportunities: jobs from official career sites, with their links and marks" width="1440" height="900">
-      <figcaption>New Opportunities (example data)</figcaption></figure>
-    <figure class="shot"><img src="img/pipeline.png" alt="My Pipeline: applications by status, lead roles apart" width="1440" height="900">
-      <figcaption>My Pipeline (example data)</figcaption></figure>
+  </div>
+</section>
+
+<section id="rules">
+  <div class="wrap">
+    <div class="head"><span class="kicker">02 · Filters</span>
+      <div><h2>Nothing is hidden without a reason</h2>
+        <p>Every rule that holds a job back says how many jobs it holds back, and can be switched off to look.</p></div></div>
+    <div class="split">
+      <ul class="points">
+        <li><i>a</i><div><b>Your words, your regions</b><span>Excluded title words, the parts of Israel that are too far for you, single places too.</span></div></li>
+        <li><i>b</i><div><b>Your level first</b><span>Lead, manager and head roles at the top; a job asking one or two years of experience is held back as junior.</span></div></li>
+        <li><i>c</i><div><b>The employer's own page first</b><span>Each job links to the employer's posting or career site before LinkedIn and job boards, with recruiters to look for.</span></div></li>
+      </ul>
+      <figure style="margin:0">
+        <div class="panel" aria-label="An illustration of the filters panel">
+          <div class="f"><span class="sw"></span><span class="t">Excluded word in the title<small>hardware, embedded, QC, manufacturing…</small></span><span class="c">6</span></div>
+          <div class="f"><span class="sw"></span><span class="t">A region you excluded<small>too far for you</small></span><span class="c">3</span></div>
+          <div class="f"><span class="sw"></span><span class="t">Asks 1–2 years of QA<small>a junior position for a senior</small></span><span class="c">2</span></div>
+          <div class="f"><span class="sw off"></span><span class="t">Older than 14 days<small>switched off: older jobs are shown, marked</small></span><span class="c">4</span></div>
+          <div class="f"><span class="sw"></span><span class="t">Already known<small>in your list, or decided by you</small></span><span class="c">26</span></div>
+        </div>
+        <figcaption class="cap">Illustration · the counts are an example</figcaption>
+      </figure>
+    </div>
+  </div>
+</section>
+
+<section id="screens">
+  <div class="wrap">
+    <div class="head"><span class="kicker">03 · Screens</span>
+      <div><h2>Two screens you will use every day</h2>
+        <p>Screenshots of the console on a fresh install: real openings from public career sites, example applications.</p></div></div>
+    <div class="shots">
+      <figure class="shot"><div class="win"><div class="bar"><i></i><i></i><i></i><span>New Opportunities</span></div>
+        <img src="img/opportunities.png" alt="New Opportunities: a job from an official career site with its links, marks and decision buttons" width="1440" height="900"></div>
+        <figcaption><b>New Opportunities.</b> Each job with the employer's own form, contacts to look for, and your decision.</figcaption></figure>
+      <figure class="shot"><div class="win"><div class="bar"><i></i><i></i><i></i><span>My Pipeline</span></div>
+        <img src="img/pipeline.png" alt="My Pipeline: applications by status with lead roles marked" width="1440" height="900"></div>
+        <figcaption><b>My Pipeline.</b> Your applications by status, lead roles apart, each with its history.</figcaption></figure>
+    </div>
+  </div>
+</section>
+
+<section id="private">
+  <div class="wrap">
+    <div class="head"><span class="kicker">04 · Privacy</span>
+      <div><h2>Your search stays yours</h2>
+        <p>The console is one folder on your computer. Nothing to sign up for, nobody to trust with your history.</p></div></div>
+    <dl class="spec">
+      <div><dt>Where your data is</dt><dd><code>~/CareerConsole/data</code>: the database, your settings, your mailbox's app password. Never uploaded, never part of the code you download.</dd></div>
+      <div><dt>What it talks to</dt><dd>The career sites it checks and your own mailbox, read-only: nothing is marked, moved or deleted. It listens only on your computer (127.0.0.1).</dd></div>
+      <div><dt>LinkedIn</dt><dd>Never scraped. LinkedIn jobs come only from the alert e-mails LinkedIn sends you.</dd></div>
+      <div><dt>What it costs</dt><dd>Nothing. No paid services, no API keys, no AI.</dd></div>
+      <div><dt>Backups</dt><dd><code>uv run career-console backup</code> writes one self-contained file; <code>restore</code> brings it back.</dd></div>
+    </dl>
   </div>
 </section>
 
 <section id="start">
   <div class="wrap">
-    <h2>First steps</h2>
-    <p class="sub">After the install, the console opens in your browser.</p>
+    <div class="head"><span class="kicker">05 · First steps</span>
+      <div><h2>Ten minutes to a working search</h2>
+        <p>After the install the console opens in your browser.</p></div></div>
     <ol class="steps">
-      <li><b>Search settings</b><span>Your search terms, excluded words, your level and the regions that are too far for you. The defaults are for QA and test automation, lead and senior roles: change them to your field.</span></li>
-      <li><b>Connect your Gmail</b><span>In Search settings → Job-alert e-mails. Gmail needs an app password, not your normal one: turn on 2-Step Verification at myaccount.google.com/security, then create an app password at myaccount.google.com/apppasswords. The mailbox is opened read-only.</span></li>
-      <li><b>Add your applications so far</b><span>"Add an application" on My Pipeline: the search never shows them to you as new.</span></li>
-      <li><b>Let it search by itself</b><span>Every two hours from 8:00 to 22:00: <code>cd ~/CareerConsole &amp;&amp; uv run career-console schedule --install</code>. Or press <b>Search Jobs Now</b> on your desktop.</span></li>
+      <li><span class="n">01</span><h3>Search settings</h3><p>Your search terms, excluded words, your level and the regions too far for you. The defaults are for QA and test automation, lead and senior roles: change them to your field.</p></li>
+      <li><span class="n">02</span><h3>Connect your Gmail</h3><p>Search settings → Job-alert e-mails. Gmail needs an app password, not your normal one: turn on 2-Step Verification, then create one at myaccount.google.com/apppasswords.</p></li>
+      <li><span class="n">03</span><h3>Add your applications so far</h3><p>"Add an application" on My Pipeline: a link and a few words, or dictate them. The search never shows them to you as new.</p></li>
+      <li><span class="n">04</span><h3>Let it search by itself</h3><p>Every two hours from 8:00 to 22:00: <code>cd ~/CareerConsole &amp;&amp; uv run career-console schedule --install</code>. Or press <b>Search Jobs Now</b> on your desktop.</p></li>
     </ol>
   </div>
 </section>
 
-<section>
-  <div class="wrap">
-    <h2>Good to know</h2>
-    <table>
-      <tr><td>What it costs</td><td>Nothing. No paid services, no API keys.</td></tr>
-      <tr><td>What it needs</td><td>A Mac for the one-line install and the desktop icons; on Linux and Windows it runs from the terminal.</td></tr>
-      <tr><td>Where your data is</td><td><code>~/CareerConsole/data</code>: never uploaded, never part of the code you download.</td></tr>
-      <tr><td>Backups</td><td><code>uv run career-console backup</code> writes one self-contained file; <code>restore</code> brings it back.</td></tr>
-      <tr><td>LinkedIn</td><td>Never scraped. LinkedIn jobs come only from the alert e-mails LinkedIn sends you.</td></tr>
-    </table>
+<div class="wrap close">
+  <span class="kicker">Install</span>
+  <h2>One line in Terminal, then one icon</h2>
+  <p>Run the same line again whenever you want the newest version. Your data stays as it is.</p>
+  <div class="cmd">
+    <span class="p" aria-hidden="true">$</span>
+    <code id="cmd2">curl -fsSL https://raw.githubusercontent.com/byakushka-cmd/career-console/main/install.sh | bash</code>
+    <button type="button" data-copy="cmd2">Copy</button>
   </div>
-</section>
+</div>
 </main>
 
-<footer class="wrap">Career Console · <a href="https://github.com/byakushka-cmd/career-console">source and documentation</a></footer>
+<footer class="wrap">
+  <div class="foot"><span>Career Console · runs on your computer</span>
+    <span><a class="u" href="https://github.com/byakushka-cmd/career-console">Source and documentation</a> · <a class="u" href="https://github.com/byakushka-cmd/career-console/blob/main/docs/SEARCH.md">How the search decides</a></span></div>
+  <div class="word" aria-hidden="true">Career Console</div>
+</footer>
 
 <script>
-document.getElementById("copy").addEventListener("click", function () {
-  var b = this, text = document.getElementById("cmd").textContent;
-  (navigator.clipboard ? navigator.clipboard.writeText(text) : Promise.reject()).then(function () {
-    b.textContent = "Copied"; setTimeout(function () { b.textContent = "Copy"; }, 1600);
-  }, function () { b.textContent = "Select and copy"; });
+document.querySelectorAll("[data-copy]").forEach(function (b) {
+  b.addEventListener("click", function () {
+    var text = document.getElementById(b.dataset.copy).textContent;
+    (navigator.clipboard ? navigator.clipboard.writeText(text) : Promise.reject()).then(function () {
+      b.textContent = "Copied"; setTimeout(function () { b.textContent = "Copy"; }, 1600);
+    }, function () { b.textContent = "Select it"; });
+  });
 });
 </script>
 </body>

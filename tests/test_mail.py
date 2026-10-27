@@ -442,3 +442,15 @@ def test_a_confirmation_for_a_job_you_already_put_in_your_tracker_adds_nothing(c
     raw = message("LinkedIn <jobs-noreply@linkedin.com>", "Dana, your application was sent to Acme Cloud", CONFIRMATION, "<c1@li>")
     assert mail.store(conn, "test.person@gmail.com", [raw]).get("applications", 0) == 0
     assert added.load(conn) == []
+
+
+def test_jobs_from_alerts_count_as_new_discoveries(imported_db, mailbox):
+    """A quiet day on the career sites is not "nothing new": the main page and the empty Verified Jobs point to the alerts."""
+    client = TestClient(create_app(imported_db, allowed_hosts=("testserver",), mail_imap=mailbox))
+    client.post("/mail/read", headers=SAME)
+    shown = len(mail.views(db.connect(imported_db))["shown"])
+    assert shown
+    home = client.get("/pipeline").text
+    assert f"0 from career sites · {shown} from alerts" in home and 'href="/opportunities?tab=mail"' in home
+    verified = client.get("/opportunities?tab=verified").text
+    assert f"{shown} new job{'' if shown == 1 else 's'} from your alert e-mails" in verified

@@ -327,7 +327,8 @@ def filter_records(records: list[Record], q: str = "", group: str = "all", sourc
     return records, counts
 
 
-def pipeline_overview(records: list[Record], new_jobs: int = 0, potential_leads: int = 0, new_today: int = 0) -> dict:
+def pipeline_overview(records: list[Record], new_jobs: int = 0, potential_leads: int = 0, new_today: int = 0,
+                      alert_jobs: int = 0) -> dict:
     """Five tiles in the order a job moves (new from the search, not applied yet, on hold, in progress, closed)
     and the status mix, always over all records (not the current filter)."""
     by_group = {g: sum(1 for r in records if STATE_GROUP.get(r.state) == g) for g in GROUPS}
@@ -339,8 +340,11 @@ def pipeline_overview(records: list[Record], new_jobs: int = 0, potential_leads:
                          "pct": round(width), "x": round(x, 3), "w": round(width, 3)})
         x += width
     tiles = [
-        {"label": "New discoveries", "value": new_jobs, "tone": "pr", "href": "/opportunities?tab=verified",
-         "caption": f"{new_today} new today" if new_today else "found by the search"},
+        # the career sites and your alert e-mails together: a quiet day on the sites is not "nothing new"
+        {"label": "New discoveries", "value": new_jobs + alert_jobs, "tone": "pr",
+         "href": "/opportunities?tab=" + ("verified" if new_jobs or not alert_jobs else "mail"),
+         "caption": (f"{new_jobs} from career sites · {alert_jobs} from alerts" if alert_jobs
+                     else f"{new_today} new today" if new_today else "found by the search")},
         {"label": "Not applied yet", "value": by_group["discovered"], "tone": "ai", "href": "/pipeline?group=discovered",
          "caption": "apply within two weeks"},
         {"label": "On hold", "value": by_group["decide"], "tone": "hu", "href": "/pipeline?group=decide",
@@ -780,7 +784,7 @@ def create_app(db_path: Path, allowed_hosts: tuple[str, ...] = ("127.0.0.1", "lo
         total = len(all_records)
         new_jobs = search_pipeline.opportunities(conn)["verified"]
         overview = pipeline_overview(all_records, len(new_jobs), len(search_leads.lead_views(conn)["shown"]),
-                                     sum(1 for v in new_jobs if v.is_new))
+                                     sum(1 for v in new_jobs if v.is_new), len(search_mail.views(conn)["shown"]))
         records, counts = filter_records(all_records, q, group, source, sort, review, level)
         terms = q.casefold().split()
         notice = next((r for r in all_records if r.id == updated), None) if updated is not None else None

@@ -92,7 +92,10 @@
 {% else %}
 <div class="panel empty">
   <span class="badge pr ghost"><i></i>New jobs</span>
-  <h2>{% if showing == 'hidden' %}Nothing hidden{% elif showing == 'older' %}Nothing older{% elif last_run %}No new jobs right now{% else %}Run the first search{% endif %}</h2>
+  <h2>{% if showing == 'hidden' %}Nothing hidden{% elif showing == 'older' %}Nothing older{% elif last_run %}No new jobs on the career sites right now{% else %}Run the first search{% endif %}</h2>
+  {%- if not showing and mail_count %}
+  <p><a class="btn solid" href="/opportunities?tab=mail#mail">{{ mail_count }} new job{{ '' if mail_count == 1 else 's' }} from your alert e-mails →</a></p>
+  {%- endif %}
   <p>A job appears here when it is listed on the employer’s own official board (Greenhouse, Lever, Ashby, Comeet or Workday) at the latest check, was published in the last {{ max_age }} days, matches your search terms, is in Israel or open worldwide, and is not already in your tracker or decided by you.</p>
   <p class="foot">Older jobs are kept, not deleted. Nothing is applied for automatically.</p>
 </div>
