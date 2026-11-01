@@ -48,6 +48,7 @@ WRONG_MATCH_REASONS = ["Regulatory / medical device", "Hardware / embedded", "Ma
                        "Too junior or manual"]
 NOT_FOR_ME_REASONS = ["Overqualified", "Salary", "Seniority or scope", "Location / commute", "Company", "Applied there before"]
 STALE_RUN_MINUTES = 30
+JUST_FOUND_MAX_AGE = 14     # days: when few days are shown, a job the console has only just found may be this old
 CACHE_MINUTES = 10          # a board checked successfully this recently is not fetched again (repeat clicks)
 VERIFIED_MAX_AGE_DAYS = 7   # older than this without a successful check: no longer shown as verified
 POLITE_DELAY_S = 1.0
@@ -478,6 +479,9 @@ def evaluate(posting, company: str, prof: dict, history: History, verification: 
     within = lambda day: day is None or (today - date.fromisoformat(day)).days <= max_age
     published = local_day(posting["posted_at"] or posting["source_updated_at"])
     recent = within(published)
+    if not recent and published and within(local_day(posting["first_seen_at_utc"])) \
+            and (today - date.fromisoformat(published)).days <= JUST_FOUND_MAX_AGE:
+        recent = True   # a company new to the search: its job is new to you, even if published some days before
     # The board filters that hold this job back, and the ones you turned off. A title with none of your search
     # terms is not held back by a filter: it is simply not a job you search for.
     place = gates.excluded_place(posting["location"], prof)

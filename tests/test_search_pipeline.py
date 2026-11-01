@@ -552,3 +552,20 @@ def test_a_leading_organization_is_not_a_lead_role():
     assert level("מוביל/ה טכנולוגי/ת QA & Automation משולב AI", DEFAULT_PROFILE) == "FOCUS"
     assert level("דרוש/ה מוביל/ה תחום QA", DEFAULT_PROFILE) == "FOCUS"
     assert level("ראש צוות QA לחברה מובילה", DEFAULT_PROFILE) == "FOCUS"
+
+
+def test_a_job_just_found_is_new_even_when_only_a_few_days_are_shown(conn):
+    _, prof = pipeline.current_profile(conn)
+    pipeline.save_profile(conn, {**prof, "max_age_days": 4, "fresh_days": 3})
+    now = datetime(2026, 10, 20, 8, 0, tzinfo=timezone.utc)
+    boards = FakeBoards(greenhouse={"jobs": [gh(901, "QA Team Lead", "Tel Aviv, Israel", published="2026-10-14T08:00:00Z"),
+                                             gh(902, "QA Director", "Tel Aviv, Israel", published="2026-09-01T08:00:00Z")]})
+    pipeline.run_search(conn, get=boards, now=now, sleep=lambda s: None)
+
+    def titles(lists, key):
+        return {v.posting["title"] for v in lists[key]}
+    found = pipeline.opportunities(conn, now=now)
+    assert "QA Team Lead" in titles(found, "verified") and "QA Director" in titles(found, "older")
+    later = pipeline.opportunities(conn, now=now + timedelta(days=5))
+    assert "QA Team Lead" in titles(later, "older")
+
