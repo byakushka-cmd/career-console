@@ -310,6 +310,9 @@ def load_records(conn: sqlite3.Connection, open_rows: Counter | None = None) -> 
 
 
 LEVELS = {"lead": "Lead roles", "engineer": "Engineer & other"}
+LEAD_LEVELS = ("FOCUS", "ABOVE")   # team lead, manager, head, director, as read from the title
+OPPORTUNITY_LEVELS = ("all", *LEVELS)
+LEVEL_COOKIE = "opportunities_level"
 
 
 def filter_records(records: list[Record], q: str = "", group: str = "all", source: str = "all", sort: str = "updated",
@@ -1031,16 +1034,30 @@ def create_app(db_path: Path, allowed_hosts: tuple[str, ...] = ("127.0.0.1", "lo
     @app.get("/opportunities", response_class=HTMLResponse)
     def opportunities(request: Request, tab: str = "verified", show: str = "", run: str = "", done: int | None = None,
                       noted: int | None = None, marked: int | None = None, lead_added: int | None = None, merged: int = 0,
-                      filters: str = "", conn: sqlite3.Connection = Depends(get_conn)):
-        return render_opportunities(request, conn, tab, show=show, run=run, done=done or noted or marked,
-                                    noted=bool(noted), marked=bool(marked),
-                                    lead_added=lead_added, merged=merged, filters_open=filters == "open")
+                      filters: str = "", level: str = "", conn: sqlite3.Connection = Depends(get_conn)):
+        response = render_opportunities(request, conn, tab, show=show, run=run, done=done or noted or marked,
+                                        noted=bool(noted), marked=bool(marked), lead_added=lead_added, merged=merged,
+                                        filters_open=filters == "open", level=level)
+        if level in OPPORTUNITY_LEVELS:   # the list you chose stays until you choose another
+            response.set_cookie(LEVEL_COOKIE, level, max_age=365 * 86400, httponly=True, samesite="lax")
+        return response
 
     def render_opportunities(request, conn, tab, show="", run="", done=None, noted=False, lead_added=None, merged=0, marked=False,
-                             lead_error="", lead_form=None, status_code=200, filters_open=False):
+                             lead_error="", lead_form=None, status_code=200, filters_open=False, level=""):
         tab = tab if tab in ("verified", "leads", "mail") else "verified"
+        level = level if level in OPPORTUNITY_LEVELS else request.cookies.get(LEVEL_COOKIE, "all")
+        level = level if level in OPPORTUNITY_LEVELS else "all"
         views = search_pipeline.opportunities(conn)
         mail_views = search_mail.views(conn)
+        all_jobs = {"verified": [v.ev.level for v in views["verified"] + views["reposted"]],
+                    "mail": [v.level for v in mail_views["shown"]]}
+        level_counts = {key: {"all": len(found), "lead": sum(1 for l in found if l in LEAD_LEVELS),
+                              "engineer": sum(1 for l in found if l not in LEAD_LEVELS)} for key, found in all_jobs.items()}
+        if level != "all":
+            at_level = lambda found: found in LEAD_LEVELS if level == "lead" else found not in LEAD_LEVELS
+            views = {**views, "verified": [v for v in views["verified"] if at_level(v.ev.level)],
+                     "reposted": [v for v in views["reposted"] if at_level(v.ev.level)]}
+            mail_views = {**mail_views, "shown": [v for v in mail_views["shown"] if at_level(v.level)]}
         lead_lists = search_leads.lead_views(conn)
         index = search_official.OfficialIndex(conn, search_pipeline.current_profile(conn)[1]["agency_companies"])
         lead_official = {v.lead["id"]: index.find(v.lead["company"], v.lead["role_signal"])
@@ -1063,7 +1080,7 @@ def create_app(db_path: Path, allowed_hosts: tuple[str, ...] = ("127.0.0.1", "lo
                       mail_boxes=bool(search_mail.load_config(mail_path)["mailboxes"]), mail_held=search_mail.HELD,
                       mail_decisions=search_mail.DECISIONS, mail_done=done if tab == "mail" else None,
                       mail_replies=search_replies.recent(conn) if tab == "mail" else [],
-                      filters=filters, filters_open=filters_open,
+                      filters=filters, filters_open=filters_open, level=level, level_counts=level_counts, levels=LEVELS,
                       boards_off=conn.execute("SELECT count(*) FROM search_sources WHERE enabled=0").fetchone()[0])
 
     @app.get("/diagnostics", response_class=HTMLResponse)

@@ -5,7 +5,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app.web import create_app
-from tests.test_search_pipeline import FakeBoards
+from tests.test_search_pipeline import FakeBoards, gh
 
 SAME = {"Origin": "http://testserver"}
 
@@ -365,3 +365,17 @@ def test_a_record_can_be_marked_duplicate(client, imported_db):
     conn = db.connect(imported_db)
     assert tracker.current_statuses(conn)[rid].state == "DUPLICATE"
     conn.close()
+
+
+def test_new_jobs_can_be_split_into_lead_and_engineer_roles_and_the_choice_stays(client, boards):
+    boards.greenhouse = {"jobs": [*boards.greenhouse["jobs"], gh(999, "QA Team Lead", "Tel Aviv, Israel")]}
+    run_now(client)
+    everything = posting_ids(client.get("/opportunities?tab=verified").text)
+    assert "Lead roles" in client.get("/opportunities?tab=verified").text
+    leads = posting_ids(client.get("/opportunities?tab=verified&level=lead").text)
+    assert len(leads) == 1 and "QA Team Lead" in client.get(f"/postings/{leads[0]}").text
+    assert posting_ids(client.get("/opportunities?tab=verified").text) == leads       # the last choice stays
+    engineers = posting_ids(client.get("/opportunities?tab=verified&level=engineer").text)
+    assert engineers and sorted(leads + engineers) == sorted(everything)
+    assert posting_ids(client.get("/opportunities?tab=verified&level=all").text) == everything
+    assert posting_ids(client.get("/opportunities?tab=verified&level=nonsense").text) == everything

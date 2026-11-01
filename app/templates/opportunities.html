@@ -14,6 +14,15 @@
   <a href="/opportunities?tab=mail"{% if tab == 'mail' %} aria-current="page"{% endif %}>From alerts <b>{{ mail_count }}</b></a>
 </nav>
 
+{% if tab != 'leads' %}
+<nav class="chips levels" aria-label="Level">
+  <a class="chip" href="/opportunities?tab={{ tab }}&level=all"{% if level == 'all' %} aria-current="true"{% endif %}>All levels <b>{{ level_counts[tab].all }}</b></a>
+  {%- for key, label in levels.items() %}
+  <a class="chip{{ ' pr' if key == 'lead' else '' }}" href="/opportunities?tab={{ tab }}&level={{ key }}"{% if level == key %} aria-current="true"{% endif %}>{% if key == 'lead' %}<i></i>{% endif %}{{ label }} <b>{{ level_counts[tab][key] }}</b></a>
+  {%- endfor %}
+</nav>
+{% endif %}
+
 {% if tab == 'verified' %}
 {{ run_bar(search_run, '/opportunities?tab=verified') }}
 
@@ -92,7 +101,10 @@
 {% else %}
 <div class="panel empty">
   <span class="badge pr ghost"><i></i>New jobs</span>
-  <h2>{% if showing == 'hidden' %}Nothing hidden{% elif showing == 'older' %}Nothing older{% elif last_run %}No new jobs on the career sites right now{% else %}Run the first search{% endif %}</h2>
+  <h2>{% if showing == 'hidden' %}Nothing hidden{% elif showing == 'older' %}Nothing older{% elif last_run %}{{ 'No lead roles' if level == 'lead' else 'No engineer roles' if level == 'engineer' else 'No new jobs' }} on the career sites right now{% else %}Run the first search{% endif %}</h2>
+  {%- if not showing and level != 'all' and level_counts.verified.all %}
+  <p><a class="btn" href="/opportunities?tab=verified&level=all">All levels: {{ level_counts.verified.all }} →</a></p>
+  {%- endif %}
   {%- if not showing and mail_count %}
   <p><a class="btn solid" href="/opportunities?tab=mail#mail">{{ mail_count }} new job{{ '' if mail_count == 1 else 's' }} from your alert e-mails →</a></p>
   {%- endif %}
@@ -197,7 +209,10 @@
 {% else %}
 <div class="panel empty">
   <span class="badge ai ghost"><i></i>From alerts</span>
-  <h2>{{ 'Nothing new in your alerts' if mail_boxes else 'Connect your mailbox' }}</h2>
+  <h2>{{ ('Nothing new at this level in your alerts' if level != 'all' else 'Nothing new in your alerts') if mail_boxes else 'Connect your mailbox' }}</h2>
+  {%- if level != 'all' and level_counts.mail.all %}
+  <p><a class="btn" href="/opportunities?tab=mail&level=all#mail">All levels: {{ level_counts.mail.all }} →</a></p>
+  {%- endif %}
   <p>Jobs from your LinkedIn, AllJobs and Drushim alert e-mails of the last days, after your rules: QA titles without excluded words, in Israel, not already in your tracker, not at a company you turned off. Your level first.</p>
   <p class="foot">The mailbox is opened read-only: nothing in it is marked, moved or deleted.</p>
 </div>
