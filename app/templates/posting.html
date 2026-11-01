@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% from "_macros.html" import posting_card, status_panel %}
+{% from "_macros.html" import posting_card, status_panel, cv_panel %}
 {% block title %}{{ v.company }} — {{ v.posting.title }}{% endblock %}
 {% block content %}
 <a class="back" href="/opportunities?tab=verified">← Verified Jobs</a>
@@ -10,6 +10,7 @@
 </div>
 {{ posting_card(v, hidden=hidden, view='posting', full=True) }}
 {% if rec %}{{ status_panel(rec, '/postings/' ~ v.posting.id ~ '#status', status_history) }}{% endif %}
+{{ cv_panel(cv) }}
 <section class="section">
   <h2>Your decisions <span class="count">{{ history|length }}</span></h2>
   <div class="panel rows">

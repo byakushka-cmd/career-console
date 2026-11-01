@@ -388,6 +388,47 @@
 </article>
 {%- endmacro %}
 
+{% macro cv_panel(cv, error='', typed={}) -%}
+{#- a job's copies of your CV, and a new one: only the lines marked as the CV's header change #}
+<section class="section" id="cv">
+  <h2>CV for this job{% if cv.versions %} <span class="count">{{ cv.versions|length }}</span>{% endif %}</h2>
+  <div class="panel cv-panel">
+    {% if error %}<div class="callout" role="alert"><span class="t">Not made</span><p dir="auto">{{ error }}</p></div>{% endif %}
+    {% if cv.versions %}<div class="rows">
+      {%- for v in cv.versions %}
+      <div class="row-item"><div class="l">
+        {%- for text in v.lines.values() %}<span dir="auto">{{ text }}</span>{% endfor %}
+        <span class="mono mut">{{ v.created_at_utc|local_time }} · from {{ v.cv_name }}</span>
+      </div><a class="btn" href="/cv/copies/{{ v.id }}">Download PDF</a></div>
+      {%- endfor %}
+    </div>{% endif %}
+    {%- for f in cv.files %}
+    {%- set last = cv.versions|selectattr('cv_id', 'equalto', f.id)|first %}
+    <details class="cv-make"{% if error or (loop.first and not cv.versions) %} open{% endif %}>
+      <summary>New copy from <span dir="auto">{{ f.name }}</span></summary>
+      {% if f.header %}
+      <form method="post" action="/cv/copy">
+        <input type="hidden" name="cv_id" value="{{ f.id }}">
+        <input type="hidden" name="ref" value="{{ cv.ref }}">
+        <input type="hidden" name="company" value="{{ cv.company }}">
+        <input type="hidden" name="role" value="{{ cv.role }}">
+        <input type="hidden" name="href" value="{{ cv.href }}">
+        {%- for i, text in f.header_text.items() %}
+        <label class="field">Header line {{ loop.index }}
+          <input class="note-input" name="line_{{ i }}" maxlength="160" dir="auto" value="{{ typed.get(i) or (last.lines.get(i) if last else '') or text }}"></label>
+        {%- endfor %}
+        <button class="btn solid" type="submit">Make PDF</button>
+      </form>
+      {% else %}<p class="fine">No header lines marked yet: <a href="/cv#cv-{{ f.id }}">mark them in My CV</a>.</p>{% endif %}
+    </details>
+    {%- else %}
+    <p class="mut">No CV here yet: <a href="/cv">upload it in My CV</a>.</p>
+    {%- endfor %}
+    {% if cv.files %}<p class="fine">Only these lines change; the rest of the page stays exactly as it is.</p>{% endif %}
+  </div>
+</section>
+{%- endmacro %}
+
 {% macro status_panel(rec, back, status_history) -%}
 {#- a record's status and the buttons to change it (record page; a console application on its posting page) #}
 <section class="section first" id="status">

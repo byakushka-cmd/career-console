@@ -334,6 +334,35 @@ def cmd_boards(args) -> None:
     print(f"{'Would add' if args.dry_run else 'Added'} {len(added)} board(s). Turn any off in Search settings.")
 
 
+def cmd_cv(args) -> None:
+    from app import cv, db
+    from app.web import find_job
+    db_path = Path(args.db) if args.db else paths().db
+    conn = db.connect(db_path, create=False)
+    try:
+        if args.action == "upload":
+            path = Path(args.path)
+            print(f"CV {cv.add(conn, db_path, path.name, path.read_bytes())}: {path.name}")
+        elif args.action == "copy":
+            found = find_job(conn, args.ref)
+            if not found:
+                sys.exit(f"No job {args.ref} in the console")
+            chosen = cv.get_file(conn, args.cv)
+            if chosen is None or len(args.line) != len(chosen["header"]):
+                sys.exit(f"CV {args.cv} needs {len(chosen['header']) if chosen else '?'} --line value(s), one per header line")
+            copy = cv.make_copy(conn, db_path, args.cv, args.ref, *found, dict(zip(chosen["header"], args.line)), origin="cli")
+            print(f"Copy {copy} for {args.ref} ({found[0]} — {found[1]}): http://127.0.0.1:45627{found[2]}#cv")
+        else:
+            for f in cv.files(conn):
+                print(f"CV {f['id']}: {f['name']}")
+                for number, text in f["top"]:
+                    print(f"  {'header' if number in f['header'] else '      '} {text}")
+    except ValueError as e:
+        sys.exit(str(e))
+    finally:
+        conn.close()
+
+
 def cmd_backup(args) -> None:
     print(backup_mod.backup(Path(args.db) if args.db else paths().db, paths().backups))
 
@@ -427,6 +456,15 @@ def main(argv: list[str] | None = None) -> None:
     s.add_argument("--dry-run", action="store_true")
     s.add_argument("--db")
     s.set_defaults(func=cmd_boards)
+
+    s = sub.add_parser("cv", help="your CV: list the uploaded ones, upload one, make a copy for one job")
+    s.add_argument("action", choices=["list", "upload", "copy"])
+    s.add_argument("path", nargs="?", help="upload: the PDF")
+    s.add_argument("--cv", type=int, help="copy: which CV (see list)")
+    s.add_argument("--ref", help="copy: the job, e.g. \"AD 3\"")
+    s.add_argument("--line", action="append", default=[], help="copy: a new header line; once for each header line")
+    s.add_argument("--db")
+    s.set_defaults(func=cmd_cv)
 
     s = sub.add_parser("backup", help="write a verified backup to data/backups")
     s.add_argument("--db")

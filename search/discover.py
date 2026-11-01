@@ -23,8 +23,8 @@ CANDIDATES: dict[str, list[str]] = {
     "Wix": [], "monday.com": ["mondaycom", "monday"], "Fiverr": [], "Lemonade": [], "Riskified": [], "Payoneer": [],
     "JFrog": [], "Snyk": [], "Taboola": [], "Outbrain": [], "Gong": ["gongio"], "HiBob": ["hibob"],
     "Papaya Global": [], "Cato Networks": [], "Armis": ["armissecurity"], "Wiz": ["wizinc"],
-    "Transmit Security": [], "Pagaya": [], "Melio": ["meliopayments"], "Tipalti": [], "Rapyd": [], "Similarweb": [],
-    "AppsFlyer": [], "Yotpo": [], "CyberArk": [], "Check Point": ["checkpoint"], "SentinelOne": [],
+    "Transmit Security": [], "Pagaya": ["pagayais"], "Melio": ["meliopayments"], "Tipalti": [], "Rapyd": [], "Similarweb": [],
+    "AppsFlyer": [], "Yotpo": [], "CyberArk": [], "Check Point": ["checkpoint"], "SentinelOne": ["sentinellabs"],
     "Cybereason": [], "Orca Security": [], "Axonius": [], "Claroty": [], "Pentera": [], "Cymulate": [],
     "Island": ["islandio"], "Apiiro": [], "Aqua Security": [], "Lightricks": [], "Playtika": [], "Plarium": [],
     "eToro": [], "Nayax": [], "WalkMe": [], "Sisense": [], "Optimove": [], "HoneyBook": [], "Guesty": [],
@@ -34,6 +34,10 @@ CANDIDATES: dict[str, list[str]] = {
     "Kaltura": [], "Zencity": [], "Viz.ai": [], "Hunters": ["huntersai"], "Cyera": [], "Noname Security": [],
     "Salt Security": [], "Oligo Security": ["oligo"], "Upwind": ["upwindsecurity"], "Torq": [], "BigID": [],
     "VAST Data": [], "Tufin": [], "Riverside": ["riversidefm"], "Hippo": [],
+    "Navan": ["tripactions"], "Menlo Security": [], "Perion": ["perionnetworkltd"], "SafeBreach": [],
+    "Sweet Security": [], "Tenable": ["tenableinc"], "Descope": [], "Datarails": [], "Pendo": [], "Outlook Amusements": [],
+    "WorldQuant": [], "Capitolis": [], "Astera Labs": [], "CYE": ["CYE"], "Zadara": ["Zadara"], "D-Fend Solutions": ["d-fendsolutions"],
+    "HUMAN Security": ["human"], "Unit": [], "Chamelio": [],
 }
 PROVIDERS = ("greenhouse", "lever", "ashby")
 
@@ -55,6 +59,19 @@ COMEET_BOARDS: dict[str, str] = {
     "Majestic Labs": "majesticlabs/AA.004", "Genpact Israel": "genpact/B9.008", "Nova": "nova/A5.007",
     "Surecomp": "Surecomp/24.00E", "Team8": "team8/61.003", "Guideline": "guideline/89.009",
     "Rapid Medical": "rapidmedical/5A.003", "Augmedics": "augmedics/26.00C",
+    "Cyera": "cyera/17.008", "Utila": "utila/D9.00F", "Sentrycs": "sentrycs/88.002", "Alice": "alice/D5.005",
+    "Personetics": "personetics/83.00A", "Immunai": "immunai/37.009", "Orca AI": "Orca-AI/86.003", "Nimble": "nimbleway/09.00F",
+    "LiveU": "liveu/90.00C", "Guardio": "guardio/57.000", "Medison Pharma": "medison/67.00A", "AT&T Israel": "joinattil/38.00A",
+    "Samsung Israel R&D Center": "samsung/D4.005", "MER Group": "mergroup/0B.00B", "abra IT": "abra/12.003",
+    "Rounds": "rounds/59.005", "Vishay Precision Group": "vpgsensors/C8.009", "Sensi.ai": "sensi/E7.00F",
+    "Gambit Security": "gambit_security/BA.00E", "Sunbit": "sunbit/37.001", "Pi-Cardia": "pi-cardia/A5.00B",
+    "Vectorious": "vectoriousmedtech/68.003", "Webbing": "webbing/46.00E",
+}
+
+# Workday: each employer's address has its own server and site name, so only known ones (public job pages).
+WORKDAY_BOARDS: dict[str, str] = {
+    "NVIDIA": "nvidia.wd5/NVIDIAExternalCareerSite", "Applied Materials": "amat.wd1/External",
+    "Medtronic": "medtronic.wd1/MedtronicCareers", "Edwards Lifesciences": "edwards.wd5/EdwardsCareers",
 }
 
 
@@ -100,28 +117,30 @@ def probe(company: str, extra: list[str], get=sources.http_get, sleep=time.sleep
     return best
 
 
-def probe_comeet(company: str, board: str, get=sources.http_get, sleep=time.sleep, delay: float = 0.3) -> Found:
+def probe_known(company: str, provider: str, board: str, get=sources.http_get, sleep=time.sleep, delay: float = 0.3) -> Found:
     sleep(delay)
     try:
-        postings = sources.fetch_comeet(board, get)
+        postings = sources.FETCHERS[provider](board, get)
     except sources.SourceError as e:
-        return Found(company, note=f"Comeet board not readable: {e}"[:80])
+        return Found(company, note=f"{sources.PROVIDER_NAMES[provider]} board not readable: {e}"[:80])
     israel = sum(1 for p in postings if gates.geography(p.location, p.countries, p.remote).value in gates.GEO_ELIGIBLE)
-    return Found(company, "comeet", board, len(postings), israel,
+    return Found(company, provider, board, len(postings), israel,
                  "added" if israel else "board found, but no jobs in Israel now")
 
 
 def discover(conn: sqlite3.Connection, candidates: dict[str, list[str]] | None = None, get=sources.http_get,
              sleep=time.sleep, dry_run: bool = False, comeet: dict[str, str] | None = None) -> list[Found]:
     """Try every candidate company; add the boards that list jobs in Israel now. With no arguments: the built-in
-    company list (Greenhouse, Lever, Ashby) and the known Comeet boards."""
+    company list (Greenhouse, Lever, Ashby) and the known Comeet and Workday boards."""
+    workday = {}
     if candidates is None and comeet is None:
-        comeet = COMEET_BOARDS
+        comeet, workday = COMEET_BOARDS, WORKDAY_BOARDS
     known = {(r["provider"], r["board"].casefold()) for r in conn.execute("SELECT provider, board FROM search_sources")}
     known_companies = {r["company"].casefold() for r in conn.execute("SELECT company FROM search_sources")}
     todo = [(company, lambda c=company, e=extra: probe(c, e, get, sleep))
             for company, extra in (CANDIDATES if candidates is None else candidates).items()]
-    todo += [(company, lambda c=company, b=board: probe_comeet(c, b, get, sleep)) for company, board in (comeet or {}).items()]
+    todo += [(company, lambda c=company, b=board, p=provider: probe_known(c, p, b, get, sleep))
+             for provider, boards in (("comeet", comeet or {}), ("workday", workday)) for company, board in boards.items()]
     results = []
     for company, run_probe in todo:
         if company.casefold() in known_companies:

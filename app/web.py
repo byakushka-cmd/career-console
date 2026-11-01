@@ -13,13 +13,13 @@ from collections import Counter
 from urllib.parse import parse_qs, parse_qsl, urlencode, urlsplit
 
 from fastapi import Depends, FastAPI, HTTPException, Request
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 
-from app import added as quick, db, my_links, review, tracker
+from app import added as quick, cv as my_cv, db, my_links, review, tracker
 from app.config import local_time
 from search import pipeline as search_pipeline
 from search import agencies as search_agencies
@@ -40,7 +40,7 @@ SOURCES = {"all": "All sources", "master": MASTER, "comeet": COMEET, "console": 
 SORTS = {"updated": "Last update", "applied": "Applied date", "company": "Company"}
 URL_IN_TEXT = re.compile(r"https?://[^\s,;()\[\]<>\"']+")
 NAV = [("opportunities", "New Opportunities", "/opportunities"), ("pipeline", "My Pipeline", "/pipeline"),
-       ("diagnostics", "Diagnostics", "/diagnostics")]
+       ("cv", "My CV", "/cv"), ("diagnostics", "Diagnostics", "/diagnostics")]
 
 # Colour carries one meaning each: green = a process is under way, amber = waiting on your decision,
 # lavender = surfaced by discovery/automation, neutral = ended.
@@ -221,6 +221,17 @@ class FormFields:
 
     def all(self, name: str) -> list[str]:
         return list(self.form.get(name) or [])
+
+
+def find_job(conn: sqlite3.Connection, ref: str) -> tuple[str, str, str] | None:
+    """A job by its reference (AD 3, MT 12, CC 45): company, role and its page in the console."""
+    rec = next((r for r in load_records(conn) if r.ref == ref), None)
+    if rec:
+        return rec.company, rec.role, rec.href
+    posting = re.fullmatch(r"CC (\d+)", ref)
+    row = posting and conn.execute("""SELECT p.title, s.company FROM postings p JOIN search_sources s ON s.id = p.source_id
+                                      WHERE p.id = ?""", (int(posting.group(1)),)).fetchone()
+    return (row["company"], row["title"], f"/postings/{posting.group(1)}") if row else None
 
 
 ADDED_ID_BASE = -1_000_000   # record ids of added records: below every tracker row and console posting
@@ -449,6 +460,11 @@ def create_app(db_path: Path, allowed_hosts: tuple[str, ...] = ("127.0.0.1", "lo
 
     def write_conn():
         return db.connect(db_path, create=False)
+
+    def job_cv(conn: sqlite3.Connection, ref: str, company: str, role: str, href: str) -> dict:
+        """What a job's page shows about your CV."""
+        return {"ref": ref, "company": company, "role": role, "href": href,
+                "files": my_cv.files(conn), "versions": my_cv.versions(conn, ref)}
 
     @app.post("/review/{kind}/{item_id}")
     async def decide(request: Request, kind: str, item_id: int):
@@ -730,6 +746,7 @@ def create_app(db_path: Path, allowed_hosts: tuple[str, ...] = ("127.0.0.1", "lo
             if view.ev.decision == "applied_now" else None
         return render(request, "posting.html", active="opportunities", v=view, history=history,
                       hidden=view.ev.decision in search_pipeline.HIDING, rec=rec,
+                      cv=job_cv(conn, f"CC {posting_id}", view.company, view.posting["title"], f"/postings/{posting_id}"),
                       status_history=tracker.status_history(conn, posting_id, tracker.CONSOLE_SUBJECT) if rec else [])
 
     @app.get("/diagnostics/runs/{run_id}", response_class=HTMLResponse)
@@ -804,7 +821,8 @@ def create_app(db_path: Path, allowed_hosts: tuple[str, ...] = ("127.0.0.1", "lo
 
     def safe_back(value: str) -> str:
         """Only pages of this console: My Pipeline, or a job you came from (its list or its page)."""
-        ok = value.startswith(("/pipeline", "/opportunities", "/postings/")) and "//" not in value and "\\" not in value
+        ok = value.startswith(("/pipeline", "/opportunities", "/postings/", "/added/", "/records/")) \
+            and "//" not in value and "\\" not in value
         return value if ok else "/pipeline"
 
     @app.post("/added")
@@ -833,6 +851,7 @@ def create_app(db_path: Path, allowed_hosts: tuple[str, ...] = ("127.0.0.1", "lo
         also = [j for j in conn.execute("SELECT url, location, company, title FROM mail_jobs WHERE url <> ?", (a.url or "",))
                 if search_pipeline.company_name_key(j["company"]) == key and search_pipeline.core_title(j["title"]) == role]
         return render(request, "added.html", active="pipeline", a=a, rec=rec, new=bool(new), also=also[:4],
+                      cv=job_cv(conn, rec.ref, a.company, a.role, rec.href),
                       history=[e for e in a.history])
 
     @app.post("/added/{added_id}/status")
@@ -916,6 +935,7 @@ def create_app(db_path: Path, allowed_hosts: tuple[str, ...] = ("127.0.0.1", "lo
         q = lambda sql: conn.execute(sql, (rec.id,)).fetchall()
         return render(
             request, "record.html", active="pipeline", rec=rec, fields=fields, linked=linked,
+            cv=job_cv(conn, rec.ref, rec.company, rec.role, f"/records/{rec.id}"),
             items=[i for i in items if rec.id in i.row_ids], by_id=by_id,
             applications=q("""SELECT a.state, a.applied_on, a.application_type, a.review_required, a.current_status_raw
                               FROM applications a JOIN application_sources s ON s.application_id=a.id
@@ -926,6 +946,86 @@ def create_app(db_path: Path, allowed_hosts: tuple[str, ...] = ("127.0.0.1", "lo
             row_sha=conn.execute("SELECT row_sha256 FROM legacy_rows WHERE id=?", (rec.id,)).fetchone()[0],
             back=safe_back(back), status_history=tracker.status_history(conn, rec.id),
             snapshot=conn.execute("SELECT * FROM source_snapshots WHERE id=1").fetchone())
+
+    def cv_page(request: Request, conn: sqlite3.Connection, status_code: int = 200, **context):
+        return render(request, "cv.html", status_code=status_code, active="cv", files=my_cv.files(conn),
+                      versions=my_cv.versions(conn), **context)
+
+    @app.get("/cv", response_class=HTMLResponse)
+    def cv_home(request: Request, conn: sqlite3.Connection = Depends(get_conn)):
+        return cv_page(request, conn)
+
+    @app.post("/cv/upload")
+    async def cv_upload(request: Request):
+        if not same_origin(request):
+            raise HTTPException(403, "Cross-site request refused")
+        if int(request.headers.get("content-length") or 0) > my_cv.MAX_UPLOAD + 16_384:
+            raise HTTPException(413, "This file is too large: a CV should be under 5 MB")
+        upload = (await request.form()).get("file")
+        conn = write_conn()
+        try:
+            if not getattr(upload, "filename", ""):
+                raise ValueError("Choose your CV's file first")
+            my_cv.add(conn, db_path, upload.filename, await upload.read())
+        except ValueError as e:
+            return cv_page(request, conn, status_code=400, error=str(e))
+        finally:
+            conn.close()
+        return RedirectResponse("/cv", status_code=303)
+
+    @app.post("/cv/copy")
+    async def cv_copy(request: Request):
+        """A copy of your CV for one job: only the lines marked as its header change."""
+        field = await read_form(request)
+        lines = {int(k[5:]): v[0] for k, v in field.form.items() if re.fullmatch(r"line_\d+", k)}
+        ref, company, role, href = (field(k)[:300] for k in ("ref", "company", "role", "href"))
+        href = safe_back(href)
+        conn = write_conn()
+        try:
+            my_cv.make_copy(conn, db_path, int(field("cv_id") or 0), ref, company, role, href, lines)
+        except ValueError as e:
+            return cv_page(request, conn, status_code=400, error=str(e), typed=lines,
+                           job=job_cv(conn, ref, company, role, href))
+        finally:
+            conn.close()
+        return RedirectResponse(f"{href}#cv", status_code=303)
+
+    @app.post("/cv/{cv_id}/header")
+    async def cv_header(request: Request, cv_id: int):
+        field = await read_form(request)
+        conn = write_conn()
+        try:
+            my_cv.set_header(conn, cv_id, [int(n) for n in field.all("line") if n.isdigit()])
+        except ValueError as e:
+            raise HTTPException(404, str(e))
+        finally:
+            conn.close()
+        return RedirectResponse(f"/cv#cv-{cv_id}", status_code=303)
+
+    @app.post("/cv/{cv_id}/remove")
+    async def cv_remove(request: Request, cv_id: int):
+        await read_form(request)
+        conn = write_conn()
+        try:
+            my_cv.remove(conn, cv_id)
+        finally:
+            conn.close()
+        return RedirectResponse("/cv", status_code=303)
+
+    @app.get("/cv/{cv_id}/file")
+    def cv_file(cv_id: int, conn: sqlite3.Connection = Depends(get_conn)):
+        cv = my_cv.get_file(conn, cv_id)
+        if cv is None:
+            raise HTTPException(404)
+        return FileResponse(my_cv.folder(db_path) / cv["path"], media_type="application/pdf", filename=cv["name"])
+
+    @app.get("/cv/copies/{version_id}")
+    def cv_copy_file(version_id: int, conn: sqlite3.Connection = Depends(get_conn)):
+        version = my_cv.get_version(conn, version_id)
+        if version is None:
+            raise HTTPException(404)
+        return FileResponse(my_cv.folder(db_path) / version["path"], media_type="application/pdf",
+                            filename=my_cv.download_name(version))
 
     @app.get("/opportunities", response_class=HTMLResponse)
     def opportunities(request: Request, tab: str = "verified", show: str = "", run: str = "", done: int | None = None,

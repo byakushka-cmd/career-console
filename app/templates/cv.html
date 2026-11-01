@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+{% from "_macros.html" import cv_panel %}
+{% block title %}My CV{% endblock %}
+{% block content %}
+<div class="head">
+  <span class="kicker mono up">Kept on this computer</span>
+  <h1>My CV</h1>
+  <p class="sub">Your CV as a PDF, and copies of it for one job with only the lines under your name changed.</p>
+</div>
+
+{% if job %}
+<a class="back" href="{{ job.href }}">← Back to the job</a>
+{{ cv_panel(job, error, typed) }}
+{% elif error %}
+<div class="callout" role="alert"><span class="t">Not uploaded</span><p dir="auto">{{ error }}</p></div>
+{% endif %}
+
+<section class="section" id="upload">
+  <h2>Upload a CV</h2>
+  <form class="panel cv-upload" method="post" action="/cv/upload" enctype="multipart/form-data">
+    <label class="field">PDF with text, under 5 MB <small>from Word or Google Docs; a scan cannot be changed</small>
+      <input type="file" name="file" accept="application/pdf,.pdf" required></label>
+    <button class="btn solid" type="submit">Upload</button>
+  </form>
+</section>
+
+{% for f in files %}
+<section class="section" id="cv-{{ f.id }}">
+  <h2 dir="auto">{{ f.name }}</h2>
+  <div class="panel">
+    <p class="fine">Uploaded {{ f.uploaded_at_utc|local_time }}. Tick the lines that change for each job; everything else on the page stays as it is.</p>
+    <form method="post" action="/cv/{{ f.id }}/header" class="cv-lines">
+      {%- for i, text in f.top %}
+      <label class="cv-line"><input type="checkbox" name="line" value="{{ i }}"{% if i in f.header %} checked{% endif %}> <span dir="auto">{{ text }}</span></label>
+      {%- endfor %}
+      <button class="btn" type="submit">Save these lines</button>
+    </form>
+    <div class="cv-actions">
+      <a class="btn quiet" href="/cv/{{ f.id }}/file">Download original</a>
+      <form method="post" action="/cv/{{ f.id }}/remove"><button class="btn quiet" type="submit">Remove from the list</button></form>
+    </div>
+  </div>
+</section>
+{% endfor %}
+
+<section class="section" id="copies">
+  <h2>Copies made for jobs <span class="count">{{ versions|length }}</span></h2>
+  <div class="panel rows">
+    {%- for v in versions %}
+    <div class="row-item"><div class="l">
+      <span dir="auto"><a href="{{ v.job_href or '#' }}"><span class="mono">{{ v.record_ref }}</span> {{ v.company }} — {{ v.role }}</a></span>
+      {%- for text in v.lines.values() %}<span class="mut" dir="auto">{{ text }}</span>{% endfor %}
+      <span class="mono mut">{{ v.created_at_utc|local_time }} · from {{ v.cv_name }}</span>
+    </div><a class="btn" href="/cv/copies/{{ v.id }}">Download PDF</a></div>
+    {%- else %}<p class="mut">None yet. Open a job in New Opportunities or My Pipeline and make one in its “CV for this job”.</p>{% endfor %}
+  </div>
+</section>
+{% endblock %}

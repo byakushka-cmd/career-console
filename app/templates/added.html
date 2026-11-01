@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% from "_macros.html" import state_badge, record_row, official_links, apply_links %}
+{% from "_macros.html" import state_badge, record_row, official_links, apply_links, cv_panel %}
 {% block title %}{{ a.company }} — {{ a.role }}{% endblock %}
 {% block content %}
 <a class="back" href="/pipeline">← My Pipeline</a>
@@ -46,6 +46,8 @@
     </ol>
   </div>
 </section>
+
+{{ cv_panel(cv) }}
 
 {% if rec.lead_here %}
 <section class="section" id="lead-here">

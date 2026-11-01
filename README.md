@@ -10,7 +10,7 @@ English, with Hebrew and Russian in titles, notes and dictation.
 
 ## What it does
 
-- **New Opportunities.** Checks about a hundred official career sites (Greenhouse, Lever, Ashby, Comeet,
+- **New Opportunities.** Checks more than a hundred official career sites (Greenhouse, Lever, Ashby, Comeet,
   Workday) every few hours and shows the jobs that match your search terms, are in Israel (in the regions you
   choose) and are not in your list yet. Lead roles first. Each job has its link to the employer's own posting,
   a search for it on the employer's site and contacts to look for on LinkedIn.
@@ -21,6 +21,8 @@ English, with Hebrew and Russian in titles, notes and dictation.
   few words, or dictate them.
 - **Replies.** Employers' "we got your application" and "we decided not to move forward" e-mails update the
   status by themselves; a reply never overwrites your own later update.
+- **Your CV.** Upload it as a PDF. For any job, make a copy with only the lines under your name changed (title,
+  key skills); the rest of the page stays exactly as it is.
 - **Filters you can see.** Every rule that hides a job (excluded title words, regions, junior positions,
   already known…) is listed with how many jobs it holds back, and can be turned off.
 
@@ -89,7 +91,7 @@ More about how the search decides what to show: [docs/SEARCH.md](docs/SEARCH.md)
 ## Your data
 
 Everything the console knows is in the `data/` folder inside its folder (`~/CareerConsole/data`): the database,
-your mailbox's app password, your settings, backups and logs. It is never uploaded anywhere and never part of
+your CV, your mailbox's app password, your settings, backups and logs. It is never uploaded anywhere and never part of
 the code you download. The console listens only on your computer (127.0.0.1) and contacts only the career sites
 it checks and your own mailbox.
 

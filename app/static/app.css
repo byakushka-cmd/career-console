@@ -93,7 +93,7 @@ p{margin:0}
 @media (max-width:520px){.mode{display:none}.copy-link.first{margin-left:auto}}
 
 /* bottom navigation (phones) */
-.nav-bottom{position:fixed;left:0;right:0;bottom:0;z-index:20;display:grid;grid-template-columns:repeat(3,1fr);
+.nav-bottom{position:fixed;left:0;right:0;bottom:0;z-index:20;display:grid;grid-template-columns:repeat(4,1fr);
   background:var(--header);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);
   border-top:1px solid var(--line);padding-bottom:env(safe-area-inset-bottom)}
 .nav-bottom a{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;min-height:58px;
@@ -481,3 +481,15 @@ details.fold.filters[open]>summary::after{content:"Hide filters"}
 .regions{border:0;padding:0;margin:0;display:grid;grid-template-columns:1fr;gap:0 16px}
 .regions legend{padding:0;margin-bottom:6px;font-size:14px}
 @media (min-width:640px){.regions{grid-template-columns:1fr 1fr}}
+
+/* My CV */
+.cv-panel{display:grid;gap:14px}
+.cv-make summary{cursor:pointer;color:var(--ink-2);font-size:14px}
+.cv-make form{display:grid;gap:10px;margin-top:12px}
+.cv-make .note-input{width:100%}
+.cv-make .btn,.cv-lines .btn{justify-self:start}
+.cv-upload{display:grid;gap:12px;justify-items:start}
+.cv-lines{display:grid;gap:8px;margin-top:12px}
+.cv-line{display:flex;align-items:baseline;gap:10px;font-size:14px;color:var(--ink-2)}
+.cv-actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
+.cv-panel .row-item>.btn,#copies .row-item>.btn{flex:none;white-space:nowrap}

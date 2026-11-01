@@ -67,3 +67,8 @@ def test_known_comeet_boards_are_added_only_with_jobs_in_israel(conn):
 def test_known_comeet_boards_are_well_formed():
     for company, board in discover.COMEET_BOARDS.items():
         assert sources.COMEET_BOARD.fullmatch(board), company
+
+
+def test_known_workday_boards_are_well_formed():
+    for company, board in discover.WORKDAY_BOARDS.items():
+        assert sources.WORKDAY_BOARD.fullmatch(board), company

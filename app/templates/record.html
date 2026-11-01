@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% from "_macros.html" import state_badge, record_row, review_item, official_links, status_panel, apply_links %}
+{% from "_macros.html" import state_badge, record_row, review_item, official_links, status_panel, apply_links, cv_panel %}
 {% block title %}{{ rec.company }} — {{ rec.role }}{% endblock %}
 {% block content %}
 <a class="back" href="{{ back }}">{{ '← My Pipeline' if back.startswith('/pipeline') else '← Back to the job' }}</a>
@@ -32,6 +32,7 @@
 {% endif %}
 
 {{ status_panel(rec, back, status_history) }}
+{{ cv_panel(cv) }}
 
 {% if items %}
 <section class="section first">
