@@ -17,7 +17,7 @@ from zoneinfo import ZoneInfo
 
 from app import db, legacy_import
 from app.config import DISPLAY_TZ, local_time
-from search import agencies, official, similar
+from search import agencies, crawl, official, similar
 from search import profile as gates
 from search import sources
 
@@ -600,16 +600,26 @@ def is_running(conn) -> bool:
 
 
 def run_search(conn: sqlite3.Connection, get=None, trigger: str = "cli", dry_run: bool = False, force: bool = False,
-               now: datetime | None = None, sleep=time.sleep) -> dict:
+               now: datetime | None = None, sleep=time.sleep, find_boards=None) -> dict:
     """One run. Network first (no database lock held), then all writes in one transaction.
-    A dry run fetches and evaluates but writes nothing."""
+    A dry run fetches and evaluates but writes nothing. The first run of a day first looks for new companies."""
     now = now or _now()
+    if find_boards is None and get is None:
+        find_boards = crawl.daily
     get = get or sources.http_get
     profile_id, prof = current_profile(conn)
     if not dry_run:
         collect_board_links(conn)
     run_id = None if dry_run else _start_run(conn, trigger, "live", profile_id, now)
+    new_boards = None
     try:
+        if find_boards and not dry_run:
+            try:
+                new_boards = find_boards(conn, local_day(now))
+            except Exception as e:  # new companies are a bonus: nothing about them may stop the search itself
+                with db.transaction(conn):
+                    conn.execute("UPDATE crawl_days SET finished_at_utc=?, problems=? WHERE day=?",
+                                 (_iso(_now()), str(e)[:500], local_day(now)))
         enabled = conn.execute("SELECT * FROM search_sources WHERE enabled=1 ORDER BY id").fetchall()
         fetched = []
         for i, src in enumerate(enabled):
@@ -628,6 +638,7 @@ def run_search(conn: sqlite3.Connection, get=None, trigger: str = "cli", dry_run
                 fetched.append((src, None, e, "error", int((time.monotonic() - started) * 1000)))
         workday_details(conn, fetched, prof, get, sleep)
         summary = _record(conn, run_id, fetched, prof, now, dry_run)
+        summary["new_boards"] = new_boards or []
     except BaseException as e:
         if run_id:
             with db.transaction(conn):

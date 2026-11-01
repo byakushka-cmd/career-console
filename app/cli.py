@@ -139,6 +139,8 @@ def cmd_search(args) -> None:
     print(f"  requests {s['requests']} to free official ATS endpoints; paid calls 0; cost $0.00")
     for company, error in s["errors"]:
         print(f"  ! {company}: {error}")
+    if s.get("new_boards"):
+        print(f"  new companies found ({len(s['new_boards'])}): {', '.join(s['new_boards'])}")
     if not s["dry_run"]:
         from app import notify
         conn = db.connect(Path(args.db) if args.db else paths().db, create=False)

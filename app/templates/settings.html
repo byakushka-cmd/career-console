@@ -101,6 +101,8 @@
     <label class="field">Company<input class="note-input" type="text" name="company" maxlength="120" placeholder="Company name" dir="auto"></label>
     <button class="btn solid" type="submit">Add board</button>
   </form>
+  <p class="fine">Once a day the first search also looks for companies not on this list, in the public index of Common Crawl, and adds those with jobs in Israel: turn any off below.
+    {%- if crawl %} Last on <span class="mono">{{ crawl.day }}</span>: {{ crawl.found }} boards known from it, {{ crawl.added }} added, {{ crawl.waiting }} still to check.{% if crawl.problems %} Its server was busy, so part of the list is tried again tomorrow.{% endif %}{% endif %}</p>
   <div class="panel rows sources">
     {% for row in sources %}{% set s = row.s %}
     <div class="row-item" id="source-{{ s.id }}">

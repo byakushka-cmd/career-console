@@ -291,6 +291,22 @@ FETCHERS = {"greenhouse": fetch_greenhouse, "lever": fetch_lever, "ashby": fetch
             "workday": fetch_workday}
 PROVIDER_NAMES = {"greenhouse": "Greenhouse", "lever": "Lever", "ashby": "Ashby", "comeet": "Comeet", "workday": "Workday"}
 
+def board_company(provider: str, board: str, get=http_get) -> str:
+    """The company's name as its board gives it; else its address, readable."""
+    slug = board.split("/")[0]
+    fallback = re.sub(r"[-_.]+", " ", slug).strip().title() or slug
+    try:
+        if provider == "comeet":
+            found = re.search(r'COMPANY_DATA\s*=\s*\{\s*"name"\s*:\s*("(?:[^"\\]|\\.)*")',
+                              get(f"https://www.comeet.com/jobs/{quote(board, safe='/')}").decode("utf-8", "replace"))
+            return (json.loads(found.group(1)).strip() or fallback) if found else fallback
+        if provider == "greenhouse":
+            return (_json(get(f"https://boards-api.greenhouse.io/v1/boards/{quote(board)}")).get("name") or fallback).strip()
+    except (SourceError, ValueError):
+        pass
+    return fallback
+
+
 _DETECT = [
     ("greenhouse", re.compile(r"(?:job-)?boards(?:\.eu)?\.greenhouse\.io/(?:embed/job_app\?for=)?([A-Za-z0-9_-]+)", re.I)),
     ("greenhouse", re.compile(r"boards-api(?:\.eu)?\.greenhouse\.io/v1/boards/([A-Za-z0-9_-]+)", re.I)),

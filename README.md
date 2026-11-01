@@ -13,7 +13,8 @@ English, with Hebrew and Russian in titles, notes and dictation.
 - **New Opportunities.** Checks more than a hundred official career sites (Greenhouse, Lever, Ashby, Comeet,
   Workday) every few hours and shows the jobs that match your search terms, are in Israel (in the regions you
   choose) and are not in your list yet. Lead roles first. Each job has its link to the employer's own posting,
-  a search for it on the employer's site and contacts to look for on LinkedIn.
+  a search for it on the employer's site and contacts to look for on LinkedIn. Once a day it also looks for companies
+  it does not know yet in a public web archive and adds those with jobs in Israel.
 - **Job-alert e-mails.** Reads the alerts LinkedIn, AllJobs and Drushim send you, from your own mailbox
   (read-only), and puts their jobs through the same rules.
 - **My Pipeline.** All your applications: status, history, notes, the same job seen through different sources.
@@ -93,7 +94,8 @@ More about how the search decides what to show: [docs/SEARCH.md](docs/SEARCH.md)
 Everything the console knows is in the `data/` folder inside its folder (`~/CareerConsole/data`): the database,
 your CV, your mailbox's app password, your settings, backups and logs. It is never uploaded anywhere and never part of
 the code you download. The console listens only on your computer (127.0.0.1) and contacts only the career sites
-it checks and your own mailbox.
+it checks, your own mailbox and, once a day, the public index of [Common Crawl](https://commoncrawl.org), where it
+asks which companies have job boards; nothing about you is sent.
 
 ```bash
 uv run career-console backup

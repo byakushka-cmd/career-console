@@ -23,6 +23,7 @@ from app import added as quick, cv as my_cv, db, my_links, review, tracker
 from app.config import local_time
 from search import pipeline as search_pipeline
 from search import agencies as search_agencies
+from search import crawl as search_crawl
 from search import official as search_official
 from search import leads as search_leads
 from search import mail as search_mail
@@ -667,7 +668,7 @@ def create_app(db_path: Path, allowed_hosts: tuple[str, ...] = ("127.0.0.1", "lo
                       mail_reads={r["mailbox"]: r for r in search_mail.last_reads(conn)}, regions=search_profile.REGIONS,
                       links=links_form if links_form is not None else my_links.load(links_path), link_fields=my_links.FIELDS,
                       versions=conn.execute("SELECT count(*) FROM search_profile_versions").fetchone()[0],
-                      sources=rows, error=error, saved=saved)
+                      sources=rows, error=error, saved=saved, crawl=search_crawl.status(conn))
 
     @app.post("/opportunities/settings/mail")
     async def save_mailbox(request: Request):

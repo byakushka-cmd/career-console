@@ -285,7 +285,7 @@ footer{border-top:1px solid var(--line);margin-top:72px;padding-top:28px}
           it keeps the record.</p></div></div>
     <div class="flow">
       <div class="step"><span class="n">01</span><h3><span class="dot l"></span>Find</h3>
-        <p>More than a hundred official career sites (Greenhouse, Lever, Ashby, Comeet, Workday) and the alerts LinkedIn, AllJobs and Drushim send to your Gmail.</p></div>
+        <p>More than a hundred official career sites (Greenhouse, Lever, Ashby, Comeet, Workday), more found by themselves once a day, and the alerts LinkedIn, AllJobs and Drushim send to your Gmail.</p></div>
       <div class="step"><span class="n">02</span><h3><span class="dot a"></span>Filter</h3>
         <p>Your search terms, your regions of Israel, your level. A job you already know never comes back as new.</p></div>
       <div class="step"><span class="n">03</span><h3><span class="dot g"></span>Track</h3>
@@ -344,7 +344,7 @@ footer{border-top:1px solid var(--line);margin-top:72px;padding-top:28px}
         <p>The console is one folder on your computer. Nothing to sign up for, nobody to trust with your history.</p></div></div>
     <dl class="spec">
       <div><dt>Where your data is</dt><dd><code>~/CareerConsole/data</code>: the database, your settings, your mailbox's app password. Never uploaded, never part of the code you download.</dd></div>
-      <div><dt>What it talks to</dt><dd>The career sites it checks and your own mailbox, read-only: nothing is marked, moved or deleted. It listens only on your computer (127.0.0.1).</dd></div>
+      <div><dt>What it talks to</dt><dd>The career sites it checks and your own mailbox, read-only: nothing is marked, moved or deleted. Once a day, the public index of Common Crawl, asked which companies have job boards; nothing about you is sent. It listens only on your computer (127.0.0.1).</dd></div>
       <div><dt>LinkedIn</dt><dd>Never scraped. LinkedIn jobs come only from the alert e-mails LinkedIn sends you.</dd></div>
       <div><dt>What it costs</dt><dd>Nothing. No paid services, no API keys, no AI.</dd></div>
       <div><dt>Backups</dt><dd><code>uv run career-console backup</code> writes one self-contained file; <code>restore</code> brings it back.</dd></div>
