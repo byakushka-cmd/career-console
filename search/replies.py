@@ -30,7 +30,7 @@ from app import db
 QUERY = ('-from:jobalerts-noreply@linkedin.com -from:jobs-noreply@linkedin.com -from:alljob.co.il -from:drushim.co.il '
          'subject:("thank you for applying" OR "thanks for applying" OR "your application" OR "application received" '
          'OR "we got it" OR "thank you for your interest" OR "application for" OR "applying for" OR "applying to" '
-         'OR "application status" OR "application at" OR candidacy OR מועמדות OR מועמדותך OR "קורות החיים" OR הגשת '
+         'OR "application status" OR "application at" OR candidacy OR מועמדות OR המועמדות OR מועמדותך OR "קורות החיים" OR הגשת '
          'OR שהגשת)')
 
 _REJECT = re.compile(
@@ -45,7 +45,7 @@ _CONFIRM = re.compile(
     r"thanks? (?:you )?for (?:applying|your application|submitting)|thank you for your interest|"
     r"we(?:'ve| have)? (?:got|received|reviewed) your (?:job )?(?:application|cv|resume)|application (?:was )?received|"
     r"we got it|received your (?:application|cv|resume)|"
-    r"קיבלנו את|התקבלו בהצלחה|תודה על הגשת|תודה שהגשת|הגשת מועמדות|קורות החיים שלך", re.I)
+    r"קיבלנו את|התקבלו בהצלחה|תודה על הגשת|תודה שהגשת|הגשת מועמדות|קורות החיים שלך|המועמדות נשלחה|המועמדות שלך נשלחה", re.I)
 
 # A reply's subject says what it is about: "Thank you for applying for the <role> position at <company>",
 # "We Got It: Thanks for applying for <role>", "Thanks for applying to <company>!", "Your application for <role> at
@@ -57,6 +57,8 @@ _ROLE_AT = re.compile(r"^(?P<title>.+?)(?: (?:position|role|job))?\s*(?:\bat\b|@
 _ROLE_ONLY = re.compile(r"^(?P<title>.+?)(?: (?:position|role|job))?$", re.I)
 _HEBREW_SUBJECT = re.compile(r"מועמדותך למשרת (?P<title>.+?) ב(?P<company>[^\s]+)$")
 # "הגשת מועמדות בנק הפועלים" (sent by Adam Total, the hiring system of many Israeli employers)
+_SENT_SUBJECT = re.compile(r"^המועמדות שלך נשלחה:\s*(?P<title>.+)$")   # a job site: its name is not the employer's
+_SENT_TO = re.compile(r"המועמדות נשלחה ל-?(?P<company>[^.\n<]{2,60}?)\.")
 _HEBREW_EMPLOYER = re.compile(r"^הגשת (?:ה)?מועמדות (?P<company>[^\d!.]{2,40}?)!?$")   # no ל/ב prefix: בנק starts with ב
 # when the subject names no role, the e-mail often does
 _BODY_ROLE = [re.compile(r"(?:for|to|in) (?:the|our) (?:role )?(?P<title>[^.\n<]{3,90}?) (?:position|role)\b", re.I),
@@ -112,6 +114,8 @@ def subject_parts(subject: str) -> tuple[str, str]:
     """(company, role) a reply's subject names, either may be empty."""
     if m := _HEBREW_SUBJECT.search(subject):
         return _clean(m.group("company")), _clean(m.group("title"))
+    if m := _SENT_SUBJECT.match(subject.strip()):
+        return "", _clean(m.group("title"))
     if m := _HEBREW_EMPLOYER.match(subject.strip()):
         return _clean(m.group("company")), ""
     m = _OPENING.match(subject)
@@ -148,6 +152,8 @@ def parse(msg: email.message.EmailMessage, text: str) -> Reply | None:
                 company = company or _clean(m.groupdict().get("company") or "")
                 break
     title = "" if title.casefold() in _NOT_A_ROLE else title
+    if not company and (m := _SENT_TO.search(body)):
+        company = _clean(m.group("company"))
     company = company or _company_from(name, address)
     try:
         received = parsedate_to_datetime(msg.get("Date")).astimezone(timezone.utc).isoformat(timespec="seconds")

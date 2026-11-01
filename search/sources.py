@@ -291,6 +291,20 @@ FETCHERS = {"greenhouse": fetch_greenhouse, "lever": fetch_lever, "ashby": fetch
             "workday": fetch_workday}
 PROVIDER_NAMES = {"greenhouse": "Greenhouse", "lever": "Lever", "ashby": "Ashby", "comeet": "Comeet", "workday": "Workday"}
 
+_REQUIREMENTS = re.compile(r"^\W*(?:(?:key |main |job |role )?requirements?|(?:required |minimum |key )?qualifications?|must[- ]haves?|"
+                           r"what you(?:['’]ll)? (?:bring|need)|what we(?:['’]re| are) looking for|who you are|"
+                           r"דרישות(?: התפקיד| המשרה)?)\W*$", re.I)
+
+
+def first_requirements(description: str | None, count: int = 4) -> list[str]:
+    """The first lines under the requirements heading of a job's text: what a recruiter looks for first."""
+    lines = [line.strip() for line in (description or "").splitlines()]
+    for i, line in enumerate(lines):
+        if _REQUIREMENTS.match(line):
+            return [l for l in lines[i + 1:] if l][:count]
+    return []
+
+
 def board_company(provider: str, board: str, get=http_get) -> str:
     """The company's name as its board gives it; else its address, readable."""
     slug = board.split("/")[0]

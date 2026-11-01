@@ -120,3 +120,13 @@ def test_replies_are_read_with_the_alerts(conn, imported_db):
     [r] = mail.read(conn, imported_db, box)
     assert r["ok"] and r["replies"] == 1 and r["changed"] == 1
     assert status(conn, "Globex") == {"Senior QA Engineer": "REJECTED"}
+
+
+def test_a_job_site_confirmation_names_the_employer_not_the_site(conn):
+    raw = reply("JOBTIME <office@example-jobsite.co.il>", "המועמדות שלך נשלחה: QA Lead - Agents & Automation",
+                "JOBTIME המועמדות נשלחה! המשרה: QA Lead - Agents & Automation · Vandelay המועמדות נשלחה ל-Vandelay. "
+                "כשיפתחו אותה, הסטטוס יתעדכן באזור האישי.", "<site@x>")
+    from email import message_from_bytes, policy
+    parsed = replies.parse(message_from_bytes(raw, policy=policy.default), mail.message_text(message_from_bytes(raw, policy=policy.default)))
+    assert (parsed.kind, parsed.company, parsed.title) == ("applied", "Vandelay", "QA Lead - Agents & Automation")
+

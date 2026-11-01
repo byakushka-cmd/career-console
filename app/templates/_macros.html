@@ -394,6 +394,10 @@
   <h2>CV for this job{% if cv.versions %} <span class="count">{{ cv.versions|length }}</span>{% endif %}</h2>
   <div class="panel cv-panel">
     {% if error %}<div class="callout" role="alert"><span class="t">Not made</span><p dir="auto">{{ error }}</p></div>{% endif %}
+    {% if cv.requirements %}<div class="cv-requirements">
+      <b>The first requirements of this job</b> <span class="mut">bring them into your header, in your own words</span>
+      <ul>{% for line in cv.requirements %}<li dir="auto">{{ line }}</li>{% endfor %}</ul>
+    </div>{% endif %}
     {% if cv.versions %}<div class="rows">
       {%- for v in cv.versions %}
       <div class="row-item"><div class="l">

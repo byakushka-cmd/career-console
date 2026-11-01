@@ -465,9 +465,10 @@ def create_app(db_path: Path, allowed_hosts: tuple[str, ...] = ("127.0.0.1", "lo
     def write_conn():
         return db.connect(db_path, create=False)
 
-    def job_cv(conn: sqlite3.Connection, ref: str, company: str, role: str, href: str) -> dict:
+    def job_cv(conn: sqlite3.Connection, ref: str, company: str, role: str, href: str, description: str = "") -> dict:
         """What a job's page shows about your CV."""
         return {"ref": ref, "company": company, "role": role, "href": href,
+                "requirements": search_sources.first_requirements(description),
                 "files": my_cv.files(conn), "versions": my_cv.versions(conn, ref)}
 
     @app.post("/review/{kind}/{item_id}")
@@ -750,7 +751,8 @@ def create_app(db_path: Path, allowed_hosts: tuple[str, ...] = ("127.0.0.1", "lo
             if view.ev.decision == "applied_now" else None
         return render(request, "posting.html", active="opportunities", v=view, history=history,
                       hidden=view.ev.decision in search_pipeline.HIDING, rec=rec,
-                      cv=job_cv(conn, f"CC {posting_id}", view.company, view.posting["title"], f"/postings/{posting_id}"),
+                      cv=job_cv(conn, f"CC {posting_id}", view.company, view.posting["title"], f"/postings/{posting_id}",
+                               view.posting["description"]),
                       status_history=tracker.status_history(conn, posting_id, tracker.CONSOLE_SUBJECT) if rec else [])
 
     @app.get("/diagnostics/runs/{run_id}", response_class=HTMLResponse)

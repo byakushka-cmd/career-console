@@ -493,3 +493,5 @@ details.fold.filters[open]>summary::after{content:"Hide filters"}
 .cv-line{display:flex;align-items:baseline;gap:10px;font-size:14px;color:var(--ink-2)}
 .cv-actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
 .cv-panel .row-item>.btn,#copies .row-item>.btn{flex:none;white-space:nowrap}
+.cv-requirements{font-size:14px;color:var(--ink-2)}
+.cv-requirements ul{margin:6px 0 0;padding-inline-start:18px;display:grid;gap:3px}

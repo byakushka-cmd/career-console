@@ -283,3 +283,13 @@ def test_copy_from_the_command_line(client, imported_db, tmp_path, capsys):
         main(["cv", "copy", "--cv", "1", "--ref", f"AD {ref}", "--line", "only one", "--db", str(imported_db)])
     with pytest.raises(SystemExit):
         main(["cv", "copy", "--cv", "1", "--ref", "AD 99999", "--line", "a", "--line", "b", "--db", str(imported_db)])
+
+
+def test_a_job_page_shows_the_first_requirements():
+    from search.sources import first_requirements
+    text = "Description\nGreat team.\nRequirements\n7+ years in automation\n\nLeadership role\nFrameworks from scratch\nAgile\nPython\nAdvantage"
+    assert first_requirements(text) == ["7+ years in automation", "Leadership role", "Frameworks from scratch", "Agile"]
+    assert first_requirements("דרישות התפקיד:\nניסיון של 5 שנים") == ["ניסיון של 5 שנים"]
+    assert first_requirements("Requirements for a good day are many.\nCoffee") == []
+    assert first_requirements("") == []
+
