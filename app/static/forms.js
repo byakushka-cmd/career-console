@@ -88,3 +88,17 @@
     }
   });
 })();
+
+// A button answers at once, and a second press does not send the same thing again while the page is on its way.
+(function () {
+  document.addEventListener("submit", function (e) {
+    var form = e.target;
+    if (form.dataset.sent) { e.preventDefault(); return; }
+    form.dataset.sent = "1";
+    if (e.submitter) e.submitter.classList.add("busy");
+  });
+  window.addEventListener("pageshow", function () {  // back in the browser: the page's buttons work again
+    document.querySelectorAll("form[data-sent]").forEach(function (form) { delete form.dataset.sent; });
+    document.querySelectorAll(".btn.busy").forEach(function (b) { b.classList.remove("busy"); });
+  });
+})();

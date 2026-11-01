@@ -2,7 +2,7 @@
 {% from "_macros.html" import state_badge, record_row, official_links, apply_links, cv_panel %}
 {% block title %}{{ a.company }} — {{ a.role }}{% endblock %}
 {% block content %}
-<a class="back" href="/pipeline">← My Pipeline</a>
+<a class="back" href="{{ back }}">← My Pipeline</a>
 <div class="head">
   <span class="kicker mono up">Added in console · {{ rec.ref }}</span>
   <h1 dir="auto">{{ a.role }}</h1>

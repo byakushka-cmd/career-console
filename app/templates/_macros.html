@@ -74,6 +74,39 @@
 </a>
 {%- endmacro %}
 
+{% macro pending_card(r, back) -%}
+{#- a job you have not applied to yet: the same links and buttons as its card in New Opportunities #}
+{%- set page = r.href ~ ('?back=' ~ back|urlencode if back and r.sheet != 'Career Console' else '') %}
+<article class="job" id="rec-{{ r.id }}">
+  <div class="job-top">
+    <div class="job-title">
+      <span class="co" dir="auto">{{ r.company }}</span>
+      <h3 dir="auto"><a href="{{ page }}">{{ r.role }}</a></h3>
+    </div>
+    <div class="job-links"><a class="btn" href="{{ page }}">View job</a></div>
+  </div>
+  <div class="job-meta">
+    {{ state_badge(r.state, r.label) }}
+    {%- if r.level == 'lead' %}<span class="badge pr ghost"><i></i>Lead role</span>{% else %}<span class="tag">engineer role</span>{% endif %}
+    {%- if r.agency %}<span class="tag">agency · {{ r.agency }}</span>{% endif %}
+    {%- if r.vacancy %}<span class="tag">#{{ r.vacancy|join(', #') }}</span>{% endif %}
+    {%- if r.lead_here %}<span class="tag hu" title="Your rule: you applied through this agency as a lead">applied here as lead ×{{ r.lead_here|length }}</span>{% endif %}
+    {%- if r.updated %}<span class="mono mut">{{ r.ref }} · {{ r.updated }}</span>{% endif %}
+  </div>
+  {{ apply_links(r) }}
+  <form class="job-actions" method="post" action="/records/{{ r.id }}/status">
+    <input type="hidden" name="back" value="{{ back }}">
+    <button class="btn solid" type="submit" name="state" value="APPLIED" title="You applied">Applied</button>
+    <button class="btn" type="submit" name="state" value="DUPLICATE" title="You applied to this job before: not again">Already applied</button>
+    <button class="btn" type="submit" name="state" value="SKIPPED" title="The job does not suit you">Not a fit</button>
+    <button class="btn" type="submit" name="state" value="HOLD" title="Not now: keep it on hold">Keep on hold</button>
+    <button class="btn quiet" type="submit" name="state" value="CLOSED" title="The job is gone, or no longer of interest">Hide</button>
+    <a class="btn quiet" href="{{ r.href }}#cv">CV for this job</a>
+    <input class="note-input" type="text" name="note" maxlength="2000" placeholder="Note (optional)" aria-label="Note" dir="auto">
+  </form>
+</article>
+{%- endmacro %}
+
 {% macro review_item(i, by_id, back, show_rows=True) -%}
 {%- set urgent = i.is_open and i.needs_attention %}
 <article class="ritem{{ ' urgent' if urgent else '' }}{{ ' done' if not i.is_open else '' }}" id="{{ i.anchor }}">

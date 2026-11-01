@@ -495,3 +495,4 @@ details.fold.filters[open]>summary::after{content:"Hide filters"}
 .cv-panel .row-item>.btn,#copies .row-item>.btn{flex:none;white-space:nowrap}
 .cv-requirements{font-size:14px;color:var(--ink-2)}
 .cv-requirements ul{margin:6px 0 0;padding-inline-start:18px;display:grid;gap:3px}
+.btn.busy{opacity:.55;cursor:progress}

@@ -111,3 +111,41 @@ def test_quick_add_keeps_what_you_wrote_when_something_is_missing(client):
     r = client.post("/added", headers=SAME, data={"url": "https://www.linkedin.com/jobs/view/4479000000/",
                                                   "text": "", "state": "APPLIED"})
     assert r.status_code == 400 and "Company field" in r.text and "4479000000" in r.text
+
+
+def not_applied(client, company="Vandelay Robotics", role="QA Team Lead", url="https://www.linkedin.com/jobs/view/4470000001/"):
+    r = client.post("/added", headers=SAME, data={"url": url, "company": company, "role": role, "state": "DISCOVERED"},
+                    follow_redirects=False)
+    assert r.status_code == 303
+    page = client.get("/pipeline?group=discovered").text
+    card = next(c for c in page.split('<article class="job"')[1:] if company in c)
+    return page, re.search(r'id="rec-(-?\d+)"', card).group(1)
+
+
+def test_not_applied_jobs_have_the_links_and_buttons_of_new_jobs(client):
+    page, record = not_applied(client)
+    assert "linkedin.com/jobs/view/4470000001" in page
+    assert "Find on Vandelay Robotics" in page
+    for button in ("Applied", "Already applied", "Not a fit", "Keep on hold", "Hide", "CV for this job"):
+        assert button in page
+    assert f'action="/records/{record}/status"' in page
+
+
+def test_a_button_on_a_not_applied_job_stays_in_the_list_and_can_be_undone(client):
+    _, record = not_applied(client)
+    r = client.post(f"/records/{record}/status", headers=SAME, follow_redirects=False,
+                    data={"state": "APPLIED", "note": "sent today", "back": "/pipeline?group=discovered"})
+    assert r.status_code == 303 and r.headers["location"].startswith("/pipeline?group=discovered&updated=")
+    page = client.get(r.headers["location"]).text
+    assert "Undo" in page and f'id="rec-{record}"' not in page
+    undo = client.post(f"/records/{record}/status", headers=SAME, follow_redirects=False,
+                       data={"state": "TRACKER", "back": "/pipeline?group=discovered"})
+    assert undo.status_code == 303
+    assert f'id="rec-{record}"' in client.get("/pipeline?group=discovered").text
+
+
+def test_other_lists_stay_rows_and_a_job_page_returns_to_the_list_you_came_from(client):
+    not_applied(client)
+    assert 'class="list" id="list"' in client.get("/pipeline").text
+    added_page = re.search(r'href="(/added/\d+\?back=[^"]+)"', client.get("/pipeline?group=discovered").text).group(1)
+    assert 'class="back" href="/pipeline?group=discovered"' in client.get(added_page).text

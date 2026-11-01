@@ -847,7 +847,8 @@ def create_app(db_path: Path, allowed_hosts: tuple[str, ...] = ("127.0.0.1", "lo
         return RedirectResponse(f"/added/{added_id}?new=1", status_code=303)
 
     @app.get("/added/{added_id}", response_class=HTMLResponse)
-    def added_record(request: Request, added_id: int, new: int = 0, conn: sqlite3.Connection = Depends(get_conn)):
+    def added_record(request: Request, added_id: int, new: int = 0, back: str = "/pipeline",
+                     conn: sqlite3.Connection = Depends(get_conn)):
         a = next((a for a in quick.load(conn) if a.id == added_id), None)
         if a is None:
             raise HTTPException(404)
@@ -856,7 +857,7 @@ def create_app(db_path: Path, allowed_hosts: tuple[str, ...] = ("127.0.0.1", "lo
         key, role = search_pipeline.company_name_key(a.company), search_pipeline.core_title(a.role)
         also = [j for j in conn.execute("SELECT url, location, company, title FROM mail_jobs WHERE url <> ?", (a.url or "",))
                 if search_pipeline.company_name_key(j["company"]) == key and search_pipeline.core_title(j["title"]) == role]
-        return render(request, "added.html", active="pipeline", a=a, rec=rec, new=bool(new), also=also[:4],
+        return render(request, "added.html", active="pipeline", a=a, rec=rec, new=bool(new), also=also[:4], back=safe_back(back),
                       cv=job_cv(conn, rec.ref, a.company, a.role, rec.href),
                       history=[e for e in a.history])
 
@@ -902,6 +903,9 @@ def create_app(db_path: Path, allowed_hosts: tuple[str, ...] = ("127.0.0.1", "lo
             before = listed(before_all)
             if previous.sheet == CONSOLE:     # an application you marked in the console: its posting id
                 tracker.record_console_status(conn, previous.row, field("state"), field("note"))
+            elif previous.sheet == quick.SHEET:
+                state = "DISCOVERED" if field("state") == tracker.TRACKER else field("state")   # Undo: it has no tracker reading
+                quick.set_status(conn, previous.row, state, field("note"))
             else:
                 tracker.record_status(conn, record_id, field("state"), field("note"))
             after = listed(load_records(conn))

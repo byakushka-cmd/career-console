@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% from "_macros.html" import record_row, kpi_tiles, status_mix, run_bar %}
+{% from "_macros.html" import record_row, kpi_tiles, status_mix, run_bar, pending_card %}
 {% block title %}My Pipeline{% endblock %}
 {% block content %}
 <div class="head">
@@ -100,7 +100,9 @@
 </div>
 {% endif %}
 
-{% if records %}
+{% if records and group == 'discovered' %}
+<div class="jobs" id="list">{% for r in records %}{{ pending_card(r, list_url) }}{% endfor %}</div>
+{% elif records %}
 <div class="list" id="list">
   <div class="list-head mono up" aria-hidden="true"><span>Company · role</span><span>Status</span><span>Updated</span><span>Row</span></div>
   {% for r in records %}{{ record_row(r, back=list_url) }}{% endfor %}
