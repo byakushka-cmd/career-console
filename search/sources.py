@@ -296,12 +296,22 @@ _REQUIREMENTS = re.compile(r"^\W*(?:(?:key |main |job |role )?requirements?|(?:r
                            r"דרישות(?: התפקיד| המשרה)?)\W*$", re.I)
 
 
+_NEXT_HEADING = re.compile(r"^\W*(?:advantages?|nice[- ]to[- ]haves?|bonus(?: points)?|preferred(?: qualifications)?|"
+                           r"a plus|what we offer|benefits|יתרון|יתרונות)\b|^[^.!?]{1,30}:\s*$", re.I)
+
+
 def first_requirements(description: str | None, count: int = 4) -> list[str]:
     """The first lines under the requirements heading of a job's text: what a recruiter looks for first."""
     lines = [line.strip() for line in (description or "").splitlines()]
     for i, line in enumerate(lines):
         if _REQUIREMENTS.match(line):
-            return [l for l in lines[i + 1:] if l][:count]
+            found = []
+            for l in lines[i + 1:]:
+                if _NEXT_HEADING.match(l) or len(found) == count:
+                    break   # "Advantages:", "Nice to have": what is required comes first
+                if l:
+                    found.append(l)
+            return found
     return []
 
 

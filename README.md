@@ -22,8 +22,11 @@ English, with Hebrew and Russian in titles, notes and dictation.
   few words, or dictate them.
 - **Replies.** Employers' "we got your application" and "we decided not to move forward" e-mails update the
   status by themselves; a reply never overwrites your own later update.
-- **Your CV.** Upload it as a PDF. For any job, make a copy with only the lines under your name changed (title,
-  key skills); the rest of the page stays exactly as it is.
+- **Your CV for each job.** Upload your CV as Word (.docx) or PDF, one file per language. Open a job, or paste any job's
+  text on My CV: the console shows its first requirements, what a recruiter checks in the first six seconds, and starts
+  the title under your name from the employer's own role name. Edit it and get a copy with only that title changed,
+  in Word and PDF; a title that would wrap onto a second line is refused. Making the PDF of a Word CV needs
+  [LibreOffice](https://www.libreoffice.org) (`brew install --cask libreoffice`); without it you get the Word file.
 - **Filters you can see.** Every rule that hides a job (excluded title words, regions, junior positions,
   already known…) is listed with how many jobs it holds back, and can be turned off.
 

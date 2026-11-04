@@ -5,21 +5,32 @@
 <div class="head">
   <span class="kicker mono up">Kept on this computer</span>
   <h1>My CV</h1>
-  <p class="sub">Your CV as a PDF, and copies of it for one job with only the lines under your name changed.</p>
+  <p class="sub">Your CV in Word or PDF, and copies of it for one job with only the title under your name changed.</p>
 </div>
 
 {% if job %}
 <a class="back" href="{{ job.href }}">← Back to the job</a>
-{{ cv_panel(job, error, typed) }}
+{{ cv_panel(job, error or '', typed or {}) }}
 {% elif error %}
 <div class="callout" role="alert"><span class="t">Not uploaded</span><p dir="auto">{{ error }}</p></div>
 {% endif %}
 
+<section class="section" id="any-job">
+  <h2>A CV for any job</h2>
+  <form class="panel cv-upload" method="post" action="/cv/jobs">
+    <label class="field">Company<input class="note-input" type="text" name="company" maxlength="300" dir="auto" value="{{ job_form.company if job_form else '' }}"></label>
+    <label class="field">Role <small>the job’s title as the employer writes it</small><input class="note-input" type="text" name="role" maxlength="300" required dir="auto" value="{{ job_form.role if job_form else '' }}"></label>
+    <label class="field">The job’s text <small>paste its description or requirements</small>
+      <textarea name="text" rows="6" required dir="auto">{{ job_form.text if job_form else '' }}</textarea></label>
+    <button class="btn solid" type="submit">Show its first requirements</button>
+  </form>
+</section>
+
 <section class="section" id="upload">
   <h2>Upload a CV</h2>
   <form class="panel cv-upload" method="post" action="/cv/upload" enctype="multipart/form-data">
-    <label class="field">PDF with text, under 5 MB <small>from Word or Google Docs; a scan cannot be changed</small>
-      <input type="file" name="file" accept="application/pdf,.pdf" required></label>
+    <label class="field">Word (.docx) or PDF with text, under 5 MB <small>one file per language; a scan cannot be changed</small>
+      <input type="file" name="file" accept=".docx,.pdf,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document" required></label>
     <button class="btn solid" type="submit">Upload</button>
   </form>
 </section>
@@ -28,7 +39,7 @@
 <section class="section" id="cv-{{ f.id }}">
   <h2 dir="auto">{{ f.name }}</h2>
   <div class="panel">
-    <p class="fine">Uploaded {{ f.uploaded_at_utc|local_time }}. Tick the lines that change for each job; everything else on the page stays as it is.</p>
+    <p class="fine">{{ 'Word' if f.kind == 'docx' else 'PDF' }} · uploaded {{ f.uploaded_at_utc|local_time }}. Tick the lines that change for each job (usually only the title under your name); everything else stays as it is.</p>
     <form method="post" action="/cv/{{ f.id }}/header" class="cv-lines">
       {%- for i, text in f.top %}
       <label class="cv-line"><input type="checkbox" name="line" value="{{ i }}"{% if i in f.header %} checked{% endif %}> <span dir="auto">{{ text }}</span></label>
@@ -51,7 +62,10 @@
       <span dir="auto"><a href="{{ v.job_href or '#' }}"><span class="mono">{{ v.record_ref }}</span> {{ v.company }} — {{ v.role }}</a></span>
       {%- for text in v.lines.values() %}<span class="mut" dir="auto">{{ text }}</span>{% endfor %}
       <span class="mono mut">{{ v.created_at_utc|local_time }} · from {{ v.cv_name }}</span>
-    </div><a class="btn" href="/cv/copies/{{ v.id }}">Download PDF</a></div>
+    </div><div class="cv-downloads">
+      {%- if v.pdf %}<a class="btn" href="/cv/copies/{{ v.id }}">Download PDF</a>{% endif %}
+      {%- if v.word %}<a class="btn quiet" href="/cv/copies/{{ v.id }}/word">Word</a>{% endif %}
+    </div></div>
     {%- else %}<p class="mut">None yet. Open a job in New Opportunities or My Pipeline and make one in its “CV for this job”.</p>{% endfor %}
   </div>
 </section>

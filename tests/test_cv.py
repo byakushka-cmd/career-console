@@ -293,3 +293,174 @@ def test_a_job_page_shows_the_first_requirements():
     assert first_requirements("Requirements for a good day are many.\nCoffee") == []
     assert first_requirements("") == []
 
+
+
+# ---- Word CVs: only the title paragraph changes; LibreOffice (faked here) makes the PDF ----
+import zipfile
+
+from app import cv as cv_module
+
+DOCX_NS = 'xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"'
+
+
+def make_docx(title="HEAD OF QA", name="ALEX SAMPLE") -> bytes:
+    cell = "".join(f'<w:p><w:r><w:rPr><w:b/></w:rPr><w:t>{t}</w:t></w:r></w:p>' for t in
+                   [name, title, "Automation  |  CI/CD  |  Quality Strategy", "alex@example.com"])
+    body = (f'<w:tbl><w:tr><w:tc>{cell}</w:tc></w:tr></w:tbl>'
+            '<w:p><w:r><w:t>PROFILE</w:t></w:r></w:p><w:p><w:r><w:t>Led a QA team at Acme Cloud.</w:t></w:r></w:p>')
+    out = io.BytesIO()
+    with zipfile.ZipFile(out, "w") as z:
+        z.writestr("[Content_Types].xml", '<?xml version="1.0"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"/>')
+        z.writestr("word/styles.xml", "<styles>kept as it is</styles>")
+        z.writestr("word/document.xml", f'<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:document {DOCX_NS}><w:body>{body}</w:body></w:document>')
+    return out.getvalue()
+
+
+def fake_libreoffice(wrap_after=40):
+    """Writes a one-page PDF with a line per paragraph; a paragraph longer than wrap_after takes two lines."""
+    def convert(docx):
+        lines = []
+        for _, text in cv_module.word_lines(docx.read_bytes()):
+            lines += [text[:wrap_after], text[wrap_after:]] if len(text) > wrap_after else [text]
+        out = docx.with_suffix(".pdf")
+        c = canvas.Canvas(str(out), pagesize=(612, 792))
+        c.setFont("Helvetica", 10)
+        for n, line in enumerate(lines):
+            c.drawString(30, 760 - n * 14, line)
+        c.save()
+        return out
+    return convert
+
+
+def test_a_word_cv_offers_only_its_title_under_the_name():
+    lines = cv_module.word_lines(make_docx())
+    assert [t for _, t in lines][:3] == ["ALEX SAMPLE", "HEAD OF QA", "Automation | CI/CD | Quality Strategy"]
+    assert [t for i, t in lines if i in cv_module.word_header_guess(lines)] == ["HEAD OF QA"]
+
+
+def test_a_word_copy_changes_one_paragraph_and_nothing_else():
+    data = make_docx()
+    title = cv_module.word_header_guess(cv_module.word_lines(data))[0]
+    out = cv_module.word_retitle(data, {title: "AUTOMATION TEAM LEAD | QUALITY ENGINEERING"})
+    before, after = zipfile.ZipFile(io.BytesIO(data)), zipfile.ZipFile(io.BytesIO(out))
+    assert before.namelist() == after.namelist()
+    assert before.read("word/styles.xml") == after.read("word/styles.xml")
+    texts = [t for _, t in cv_module.word_lines(out)]
+    assert texts == ["ALEX SAMPLE", "AUTOMATION TEAM LEAD | QUALITY ENGINEERING", "Automation | CI/CD | Quality Strategy",
+                     "alex@example.com", "PROFILE", "Led a QA team at Acme Cloud."]
+    assert b"<w:b/>" in after.read("word/document.xml")    # the title keeps its formatting
+
+
+def test_a_word_cv_comes_back_as_word_and_pdf(client, imported_db, monkeypatch):
+    monkeypatch.setattr(cv_module, "word_to_pdf", fake_libreoffice())
+    r = client.post("/cv/upload", headers=SAME, files={"file": ("Alex_Sample_CV_Master_EN.docx", make_docx(), "application/octet-stream")},
+                    follow_redirects=False)
+    assert r.status_code == 303
+    conn = db.connect(imported_db, create=False)
+    f = cv.files(conn)[0]
+    assert f["kind"] == "docx" and f["pdf_path"] and len(f["header"]) == 1
+    job = added_job(client)
+    r = client.post("/cv/copy", headers=SAME, follow_redirects=False,
+                    data={"cv_id": f["id"], "ref": "AD 1", "company": "Acme Cloud", "role": "QA Lead", "href": job,
+                          f"line_{f['header'][0]}": "ראש צוות אוטומציה"})      # Hebrew is fine in Word
+    assert r.status_code == 303
+    v = cv.versions(conn)[0]
+    word, pdf = client.get(f"/cv/copies/{v['id']}/word"), client.get(f"/cv/copies/{v['id']}")
+    assert 'filename*=utf-8\'\'Alex_Sample_CV_Acme_Cloud_EN.docx' in word.headers["content-disposition"] or \
+        'filename="Alex_Sample_CV_Acme_Cloud_EN.docx"' in word.headers["content-disposition"]
+    assert "ראש צוות אוטומציה" in [t for _, t in cv_module.word_lines(word.content)]
+    assert pdf.headers["content-type"] == "application/pdf"
+    assert "Word" in client.get(job).text and "Download PDF" in client.get(job).text
+
+
+def test_a_title_that_would_wrap_is_refused_and_leaves_nothing_behind(client, imported_db, monkeypatch):
+    monkeypatch.setattr(cv_module, "word_to_pdf", fake_libreoffice(wrap_after=40))
+    client.post("/cv/upload", headers=SAME, files={"file": ("CV.docx", make_docx(), "application/octet-stream")})
+    conn = db.connect(imported_db, create=False)
+    f = cv.files(conn)[0]
+    files_before = set(cv.folder(imported_db).iterdir())
+    r = client.post("/cv/copy", headers=SAME, data={"cv_id": f["id"], "ref": "AD 1", "company": "Acme", "role": "QA",
+                                                     "href": added_job(client), f"line_{f['header'][0]}": "X" * 60})
+    assert r.status_code == 400 and "second line" in r.text
+    assert set(cv.folder(imported_db).iterdir()) == files_before and cv.versions(conn) == []
+
+
+def test_without_libreoffice_a_word_cv_still_comes_back_as_word(client, imported_db, monkeypatch):
+    monkeypatch.setattr(cv_module, "word_to_pdf", lambda docx: None)
+    client.post("/cv/upload", headers=SAME, files={"file": ("CV.docx", make_docx(), "application/octet-stream")})
+    conn = db.connect(imported_db, create=False)
+    f = cv.files(conn)[0]
+    client.post("/cv/copy", headers=SAME, data={"cv_id": f["id"], "ref": "AD 1", "company": "Acme", "role": "QA",
+                                                "href": added_job(client), f"line_{f['header'][0]}": "QA TEAM LEAD"})
+    v = cv.versions(conn)[0]
+    assert v["word"] and not v["pdf"]
+    assert client.get(f"/cv/copies/{v['id']}").status_code == 404
+    assert client.get(f"/cv/copies/{v['id']}/word").status_code == 200
+
+
+# ---- A job's requirements, pasted or read, and a title to start from ----
+JOB_TEXT = """About the role
+We are looking for an Automation Team Lead.
+Requirements
+• 7+ years in automation testing
+• Proven QA/automation leadership
+• Automation frameworks built from scratch
+• Agile / Scrum
+• Communication with business
+• Python or Java
+• CI/CD
+• A bonus line that is not shown"""
+
+
+def test_a_title_to_start_from_is_the_employers_own_role():
+    assert cv_module.suggest_title("Automation Team Lead — LinkedIn #4485406189", "HEAD OF QA") == "AUTOMATION TEAM LEAD"
+    assert cv_module.suggest_title("QA Engineer – Web & Mobile (5516)", "Head of QA") == "QA Engineer – Web & Mobile"
+    assert cv_module.suggest_title("23370 - Automation Team Lead", "") == "Automation Team Lead"
+    assert cv_module.suggest_title("QA Lead | Digital, Tel Aviv", "") == "QA Lead"
+
+
+def test_requirements_come_from_the_heading_or_the_first_lines():
+    assert cv_module.requirements_of(JOB_TEXT) == ["• 7+ years in automation testing", "• Proven QA/automation leadership",
+                                                    "• Automation frameworks built from scratch", "• Agile / Scrum",
+                                                    "• Communication with business", "• Python or Java", "• CI/CD"]
+    assert cv_module.requirements_of("Lead our QA team of five people\nOwn the release quality gates") == \
+        ["Lead our QA team of five people", "Own the release quality gates"]
+
+
+def test_a_cv_for_any_job_pasted_on_my_cv(client, imported_db):
+    data = make_pdf()
+    upload(client, data)
+    r = client.post("/cv/jobs", headers=SAME, follow_redirects=False,
+                    data={"company": "Vandelay", "role": "Automation Team Lead — LinkedIn #4400000000", "text": JOB_TEXT})
+    assert r.status_code == 303
+    page = client.get(r.headers["location"].split("#")[0]).text
+    assert "7+ years in automation testing" in page and "A bonus line" not in page
+    assert 'value="AUTOMATION TEAM LEAD"' in page            # the first header line starts from the role
+    conn = db.connect(imported_db, create=False)
+    f = cv.files(conn)[0]
+    job_ref = cv.versions(conn) == [] and "JOB 1"
+    r = client.post("/cv/copy", headers=SAME, follow_redirects=False,
+                    data={"cv_id": f["id"], "ref": job_ref, "company": "Vandelay", "role": "Automation Team Lead",
+                          "href": "/cv/jobs/1", f"line_{f['header'][0]}": "AUTOMATION TEAM LEAD"})
+    assert r.headers["location"] == "/cv/jobs/1#cv"
+    assert "AUTOMATION TEAM LEAD" in client.get("/cv/jobs/1").text
+    assert client.post("/cv/jobs", headers=SAME, data={"company": "", "role": "", "text": ""}).status_code == 400
+
+
+def test_a_job_without_a_description_gets_its_text_pasted(client, imported_db):
+    job = added_job(client)
+    page = client.get(job).text
+    assert "Paste the job’s text" in page and "first requirements of this job" not in page
+    ref = "AD " + job.rsplit("/", 1)[1]
+    long_text = JOB_TEXT + "\n" + "שורה ארוכה בעברית " * 300     # longer than an ordinary form
+    r = client.post("/cv/job-text", headers=SAME, follow_redirects=False,
+                    data={"ref": ref, "company": "Acme Cloud", "role": "QA Lead", "href": job, "text": long_text})
+    assert r.status_code == 303 and r.headers["location"] == f"{job}#cv"
+    assert "Proven QA/automation leadership" in client.get(job).text
+
+
+def test_a_hebrew_cv_keeps_its_own_title_and_advantages_are_not_requirements():
+    assert cv_module.suggest_title("Head of Automation", "ראש/ת צוות QA ואוטומציה") == ""
+    assert cv_module.suggest_title("ראש צוות אוטומציה", "ראש/ת צוות QA ואוטומציה") == "ראש צוות אוטומציה"
+    text = "Requirements\n7+ years in automation\nLeadership role\nAdvantage :\nTrading products"
+    assert cv_module.requirements_of(text) == ["7+ years in automation", "Leadership role"]

@@ -496,3 +496,7 @@ details.fold.filters[open]>summary::after{content:"Hide filters"}
 .cv-requirements{font-size:14px;color:var(--ink-2)}
 .cv-requirements ul{margin:6px 0 0;padding-inline-start:18px;display:grid;gap:3px}
 .btn.busy{opacity:.55;cursor:progress}
+.cv-downloads{display:flex;gap:6px;flex:none}
+.cv-paste{display:grid;gap:8px;margin-top:10px}
+.cv-paste textarea,.cv-upload textarea{width:100%;border-radius:9px;border:1px solid var(--line-2);background:var(--panel);color:var(--ink);font:inherit;font-size:14px;padding:10px 12px;resize:vertical}
+.cv-upload .field{width:100%}

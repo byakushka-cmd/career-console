@@ -428,15 +428,31 @@
   <div class="panel cv-panel">
     {% if error %}<div class="callout" role="alert"><span class="t">Not made</span><p dir="auto">{{ error }}</p></div>{% endif %}
     {% if cv.requirements %}<div class="cv-requirements">
-      <b>The first requirements of this job</b> <span class="mut">bring them into your header, in your own words</span>
+      <b>The first requirements of this job</b> <span class="mut">what a recruiter checks in six seconds: name the role they hire for, in a few words, not a list of keywords</span>
       <ul>{% for line in cv.requirements %}<li dir="auto">{{ line }}</li>{% endfor %}</ul>
     </div>{% endif %}
+    {% if not cv.ref.startswith('JOB') %}
+    <details class="cv-make"{% if not cv.requirements %} open{% endif %}>
+      <summary>{{ 'Paste the job’s text again' if cv.pasted else ('Paste the job’s text' if not cv.requirements else 'Use another text of this job') }}</summary>
+      <form method="post" action="/cv/job-text" class="cv-paste">
+        <input type="hidden" name="ref" value="{{ cv.ref }}">
+        <input type="hidden" name="company" value="{{ cv.company }}">
+        <input type="hidden" name="role" value="{{ cv.role }}">
+        <input type="hidden" name="href" value="{{ cv.href }}">
+        <textarea name="text" rows="6" dir="auto" placeholder="The job’s description or its requirements, copied from its page">{{ '' }}</textarea>
+        <button class="btn" type="submit">Show its first requirements</button>
+      </form>
+    </details>
+    {% endif %}
     {% if cv.versions %}<div class="rows">
       {%- for v in cv.versions %}
       <div class="row-item"><div class="l">
         {%- for text in v.lines.values() %}<span dir="auto">{{ text }}</span>{% endfor %}
         <span class="mono mut">{{ v.created_at_utc|local_time }} · from {{ v.cv_name }}</span>
-      </div><a class="btn" href="/cv/copies/{{ v.id }}">Download PDF</a></div>
+      </div><div class="cv-downloads">
+        {%- if v.pdf %}<a class="btn" href="/cv/copies/{{ v.id }}">Download PDF</a>{% endif %}
+        {%- if v.word %}<a class="btn quiet" href="/cv/copies/{{ v.id }}/word">Word</a>{% endif %}
+      </div></div>
       {%- endfor %}
     </div>{% endif %}
     {%- for f in cv.files %}
@@ -452,16 +468,16 @@
         <input type="hidden" name="href" value="{{ cv.href }}">
         {%- for i, text in f.header_text.items() %}
         <label class="field">Header line {{ loop.index }}
-          <input class="note-input" name="line_{{ i }}" maxlength="160" dir="auto" value="{{ typed.get(i) or (last.lines.get(i) if last else '') or text }}"></label>
+          <input class="note-input" name="line_{{ i }}" maxlength="160" dir="auto" value="{{ typed.get(i) or (last.lines.get(i) if last else '') or (cv.suggest(text) if loop.first and cv.suggest and cv.suggest(text) else '') or text }}"></label>
         {%- endfor %}
-        <button class="btn solid" type="submit">Make PDF</button>
+        <button class="btn solid" type="submit">Make CV</button>
       </form>
       {% else %}<p class="fine">No header lines marked yet: <a href="/cv#cv-{{ f.id }}">mark them in My CV</a>.</p>{% endif %}
     </details>
     {%- else %}
     <p class="mut">No CV here yet: <a href="/cv">upload it in My CV</a>.</p>
     {%- endfor %}
-    {% if cv.files %}<p class="fine">Only these lines change; the rest of the page stays exactly as it is.</p>{% endif %}
+    {% if cv.files %}<p class="fine">Only these lines change; the rest of the CV stays exactly as it is. A Word CV comes back as Word and, when LibreOffice is installed, as PDF; a title that would wrap onto a second line is refused.</p>{% endif %}
   </div>
 </section>
 {%- endmacro %}

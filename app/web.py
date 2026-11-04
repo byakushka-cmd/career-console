@@ -313,6 +313,7 @@ LEVELS = {"lead": "Lead roles", "engineer": "Engineer & other"}
 LEAD_LEVELS = ("FOCUS", "ABOVE")   # team lead, manager, head, director, as read from the title
 OPPORTUNITY_LEVELS = ("all", *LEVELS)
 LEVEL_COOKIE = "opportunities_level"
+WORD = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
 
 
 def filter_records(records: list[Record], q: str = "", group: str = "all", source: str = "all", sort: str = "updated",
@@ -453,12 +454,12 @@ def create_app(db_path: Path, allowed_hosts: tuple[str, ...] = ("127.0.0.1", "lo
         origin = request.headers.get("origin")
         return origin is not None and urlsplit(origin).netloc == request.headers.get("host")
 
-    async def read_form(request: Request):
+    async def read_form(request: Request, limit: int = 16_384):
         """CSRF check, size limit and urlencoded parsing for every POST. Returns a field getter."""
         if not same_origin(request):
             raise HTTPException(403, "Cross-site request refused")
         body = await request.body()
-        if len(body) > 16_384:
+        if len(body) > limit:
             raise HTTPException(413, "Request too large")
         return FormFields(parse_qs(body.decode("utf-8", "replace"), keep_blank_values=True))
 
@@ -466,9 +467,13 @@ def create_app(db_path: Path, allowed_hosts: tuple[str, ...] = ("127.0.0.1", "lo
         return db.connect(db_path, create=False)
 
     def job_cv(conn: sqlite3.Connection, ref: str, company: str, role: str, href: str, description: str = "") -> dict:
-        """What a job's page shows about your CV."""
+        """What a job's page shows about your CV: its first requirements (from the job's text, or the text you
+        pasted), a title to start from, your CVs and the copies made for it."""
+        pasted = my_cv.job_text(conn, ref)
+        text = (pasted or {}).get("text") or description
         return {"ref": ref, "company": company, "role": role, "href": href,
-                "requirements": search_sources.first_requirements(description),
+                "requirements": my_cv.requirements_of(text), "pasted": bool(pasted and pasted["text"]),
+                "suggest": lambda current: my_cv.suggest_title(role, current),
                 "files": my_cv.files(conn), "versions": my_cv.versions(conn, ref)}
 
     @app.post("/review/{kind}/{item_id}")
@@ -827,7 +832,7 @@ def create_app(db_path: Path, allowed_hosts: tuple[str, ...] = ("127.0.0.1", "lo
 
     def safe_back(value: str) -> str:
         """Only pages of this console: My Pipeline, or a job you came from (its list or its page)."""
-        ok = value.startswith(("/pipeline", "/opportunities", "/postings/", "/added/", "/records/")) \
+        ok = value.startswith(("/pipeline", "/opportunities", "/postings/", "/added/", "/records/", "/cv/jobs/")) \
             and "//" not in value and "\\" not in value
         return value if ok else "/pipeline"
 
@@ -1000,6 +1005,38 @@ def create_app(db_path: Path, allowed_hosts: tuple[str, ...] = ("127.0.0.1", "lo
             conn.close()
         return RedirectResponse(f"{href}#cv", status_code=303)
 
+    @app.post("/cv/job-text")
+    async def cv_job_text(request: Request):
+        """The text of a job you paste on its page: its first requirements show next to your CV's title."""
+        field = await read_form(request, limit=400_000)
+        href = safe_back(field("href"))
+        conn = write_conn()
+        try:
+            my_cv.save_job_text(conn, field("ref")[:40], field("company"), field("role"), field("text"))
+        finally:
+            conn.close()
+        return RedirectResponse(f"{href}#cv", status_code=303)
+
+    @app.post("/cv/jobs")
+    async def cv_new_job(request: Request):
+        """A job that is not in the console: paste its text on My CV and make a CV for it."""
+        field = await read_form(request, limit=400_000)
+        conn = write_conn()
+        try:
+            job_id = my_cv.new_job(conn, field("company"), field("role"), field("text"))
+        except ValueError as e:
+            return cv_page(request, conn, status_code=400, error=str(e), job_form={k: field(k) for k in ("company", "role", "text")})
+        finally:
+            conn.close()
+        return RedirectResponse(f"/cv/jobs/{job_id}#cv", status_code=303)
+
+    @app.get("/cv/jobs/{job_id}", response_class=HTMLResponse)
+    def cv_job(request: Request, job_id: int, conn: sqlite3.Connection = Depends(get_conn)):
+        job = my_cv.get_job(conn, job_id)
+        if job is None:
+            raise HTTPException(404)
+        return cv_page(request, conn, job=job_cv(conn, job["record_ref"], job["company"], job["role"], f"/cv/jobs/{job_id}"))
+
     @app.post("/cv/{cv_id}/header")
     async def cv_header(request: Request, cv_id: int):
         field = await read_form(request)
@@ -1027,15 +1064,24 @@ def create_app(db_path: Path, allowed_hosts: tuple[str, ...] = ("127.0.0.1", "lo
         cv = my_cv.get_file(conn, cv_id)
         if cv is None:
             raise HTTPException(404)
-        return FileResponse(my_cv.folder(db_path) / cv["path"], media_type="application/pdf", filename=cv["name"])
+        media = "application/pdf" if cv["kind"] == "pdf" else WORD
+        return FileResponse(my_cv.folder(db_path) / cv["path"], media_type=media, filename=cv["name"])
 
     @app.get("/cv/copies/{version_id}")
     def cv_copy_file(version_id: int, conn: sqlite3.Connection = Depends(get_conn)):
         version = my_cv.get_version(conn, version_id)
-        if version is None:
+        if version is None or not version["pdf"]:
             raise HTTPException(404)
-        return FileResponse(my_cv.folder(db_path) / version["path"], media_type="application/pdf",
+        return FileResponse(my_cv.folder(db_path) / version["pdf"], media_type="application/pdf",
                             filename=my_cv.download_name(version))
+
+    @app.get("/cv/copies/{version_id}/word")
+    def cv_copy_word(version_id: int, conn: sqlite3.Connection = Depends(get_conn)):
+        version = my_cv.get_version(conn, version_id)
+        if version is None or not version["word"]:
+            raise HTTPException(404)
+        return FileResponse(my_cv.folder(db_path) / version["word"], media_type=WORD,
+                            filename=my_cv.download_name(version, "docx"))
 
     @app.get("/opportunities", response_class=HTMLResponse)
     def opportunities(request: Request, tab: str = "verified", show: str = "", run: str = "", done: int | None = None,
