@@ -30,7 +30,7 @@ from app import db
 QUERY = ('-from:jobalerts-noreply@linkedin.com -from:jobs-noreply@linkedin.com -from:alljob.co.il -from:drushim.co.il '
          'subject:("thank you for applying" OR "thanks for applying" OR "your application" OR "application received" '
          'OR "we got it" OR "thank you for your interest" OR "application for" OR "applying for" OR "applying to" '
-         'OR "application status" OR "application at" OR candidacy OR מועמדות OR המועמדות OR מועמדותך OR "קורות החיים" OR הגשת '
+         'OR "application status" OR "application at" OR candidacy OR מועמדות OR המועמדות OR מועמדותך OR מועמדתך OR "קורות החיים" OR הגשת '
          'OR שהגשת)')
 
 _REJECT = re.compile(
@@ -40,7 +40,7 @@ _REJECT = re.compile(
     r"did not find a match|not (?:a|the right) (?:fit|match) for|no longer (?:under consideration|considering)|"
     r"position has been filled|regret to inform|unable to offer|unfortunately,? (?:we|after|at this|this time|the)|"
     r"לצערנו|לא נמשיך|שלא להמשיך|מועמדים אחרים|מועמד אחר|החלטנו להמשיך עם|לא נוכל להתקדם|החלטנו שלא|לא נבחרת|"
-    r"לא נמצאה התאמה", re.I)
+    r"לא נמצאה התאמה|אין באפשרותנו להציע", re.I)
 _CONFIRM = re.compile(
     r"thanks? (?:you )?for (?:applying|your application|submitting)|thank you for your interest|"
     r"we(?:'ve| have)? (?:got|received|reviewed) your (?:job )?(?:application|cv|resume)|application (?:was )?received|"
@@ -57,6 +57,7 @@ _ROLE_AT = re.compile(r"^(?P<title>.+?)(?: (?:position|role|job))?\s*(?:\bat\b|@
 _ROLE_ONLY = re.compile(r"^(?P<title>.+?)(?: (?:position|role|job))?$", re.I)
 _HEBREW_SUBJECT = re.compile(r"מועמדותך למשרת (?P<title>.+?) ב(?P<company>[^\s]+)$")
 # "הגשת מועמדות בנק הפועלים" (sent by Adam Total, the hiring system of many Israeli employers)
+_CANDIDACY_FOR = re.compile(r"^מועמדו?תך לתפקיד (?:ל\s)?(?P<title>.+)$")   # "מועמדתך לתפקיד ל ראש צוות בדיקות תוכנה"
 _SENT_SUBJECT = re.compile(r"^המועמדות שלך נשלחה:\s*(?P<title>.+)$")   # a job site: its name is not the employer's
 _SENT_TO = re.compile(r"המועמדות נשלחה ל-?(?P<company>[^.\n<]{2,60}?)\.")
 _HEBREW_EMPLOYER = re.compile(r"^הגשת (?:ה)?מועמדות (?P<company>[^\d!.]{2,40}?)!?$")   # no ל/ב prefix: בנק starts with ב
@@ -115,6 +116,8 @@ def subject_parts(subject: str) -> tuple[str, str]:
     if m := _HEBREW_SUBJECT.search(subject):
         return _clean(m.group("company")), _clean(m.group("title"))
     if m := _SENT_SUBJECT.match(subject.strip()):
+        return "", _clean(m.group("title"))
+    if m := _CANDIDACY_FOR.match(subject.strip()):
         return "", _clean(m.group("title"))
     if m := _HEBREW_EMPLOYER.match(subject.strip()):
         return _clean(m.group("company")), ""

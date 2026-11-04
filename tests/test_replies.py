@@ -130,3 +130,13 @@ def test_a_job_site_confirmation_names_the_employer_not_the_site(conn):
     parsed = replies.parse(message_from_bytes(raw, policy=policy.default), mail.message_text(message_from_bytes(raw, policy=policy.default)))
     assert (parsed.kind, parsed.company, parsed.title) == ("applied", "Vandelay", "QA Lead - Agents & Automation")
 
+
+def test_a_hebrew_screening_letter_saying_no_is_a_rejection():
+    raw = reply("Recruiter <recruiter@example-ness.co.il>", "מועמדתך לתפקיד ל ראש צוות בדיקות תוכנה",
+                "הנדון: הודעה למועמד לעבודה בדבר התקדמות הליכי המיון\n"
+                "שמחנו לשוחח עמך , אך הרינו להודיעך כי כרגע אין באפשרותנו להציע לך את התפקיד הנ''ל.", "<letter@x>")
+    from email import message_from_bytes, policy
+    msg = message_from_bytes(raw, policy=policy.default)
+    parsed = replies.parse(msg, mail.message_text(msg))
+    assert (parsed.kind, parsed.title) == ("rejected", "ראש צוות בדיקות תוכנה")
+    assert "מועמדתך" in replies.QUERY
