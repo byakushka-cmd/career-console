@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import email
 import email.policy
+import html
 import re
 import sqlite3
 from dataclasses import dataclass
@@ -141,7 +142,8 @@ def parse(msg: email.message.EmailMessage, text: str) -> Reply | None:
     name, address = parseaddr(str(msg.get("From", "")))
     if subject != str(msg.get("Subject", "")).strip() and (m := _FORWARDED_FROM.search(text or "")):
         name, address = parseaddr(m.group(1))     # your forward: the employer is the original sender
-    body = (text or "")[:4000]
+    # some hiring systems put HTML entities into the plain-text part ("in the&nbsp;QA Engineer&nbsp;position")
+    body = re.sub(r"[^\S\n]+", " ", html.unescape(text or ""))[:4000]
     if not _APPLICATION_SUBJECT.search(subject):
         return None     # a newsletter that happens to say "unfortunately" or "thank you"
     kind = "rejected" if _REJECT.search(body) else "applied" if _CONFIRM.search(subject + " " + body) else None

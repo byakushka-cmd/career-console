@@ -140,3 +140,18 @@ def test_a_hebrew_screening_letter_saying_no_is_a_rejection():
     parsed = replies.parse(msg, mail.message_text(msg))
     assert (parsed.kind, parsed.title) == ("rejected", "ראש צוות בדיקות תוכנה")
     assert "מועמדתך" in replies.QUERY
+
+
+def test_a_plain_text_letter_with_html_spaces_names_its_role(conn):
+    # some hiring systems put HTML entities into the plain-text part: "in the&nbsp;QA Engineer for Payments&nbsp;position"
+    added.add(conn, "", "Initech — QA Engineer - Payments", "APPLIED", company="Initech", role="QA Engineer - Payments")
+    raw = reply("Initech Hiring Team <notifications@recruitment.initech.com>", "Re: Your application to Initech",
+                "Hi&nbsp;Dana,\nThank you for showing interest in the&nbsp;QA Engineer for Payments&nbsp;position at "
+                "Initech and taking the time to apply.&nbsp;\nWe wanted to let you know that unfortunately, we&rsquo;re no "
+                "longer recruiting for this position.\nPlease don&#39;t hesitate to apply in the future if you find "
+                "another position you think you&rsquo;re a good match for.", "<nbsp@x>",
+                date="Tue, 20 Oct 2099 08:00:00 +0000")
+    replies.process(conn, "me@gmail.com", [raw])
+    [row] = replies.recent(conn)
+    assert (row["kind"], row["title"], row["record_ref"]) == ("rejected", "QA Engineer for Payments", "AD 1")
+    assert status(conn, "Initech") == {"QA Engineer - Payments": "REJECTED"}
