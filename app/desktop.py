@@ -80,6 +80,11 @@ def install(desktop: Path | None = None) -> list[Path]:
             shutil.rmtree(app)
         subprocess.run(["osacompile", "-o", str(app), "-e", script.strip()], check=True, capture_output=True)
         build_icns(ICONS / icon, app / "Contents" / "Resources" / "applet.icns")
+        # newer macOS takes the icon from Assets.car (the script scroll) over applet.icns: drop it and re-sign
+        (app / "Contents" / "Resources" / "Assets.car").unlink(missing_ok=True)
+        subprocess.run(["/usr/libexec/PlistBuddy", "-c", "Delete :CFBundleIconName", str(app / "Contents" / "Info.plist")],
+                       capture_output=True)
+        subprocess.run(["codesign", "--force", "--sign", "-", str(app)], check=True, capture_output=True)
         subprocess.run(["touch", str(app)], check=True)  # make Finder pick up the new icon
         made.append(app)
     return made

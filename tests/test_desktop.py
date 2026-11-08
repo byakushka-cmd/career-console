@@ -22,4 +22,5 @@ def test_shortcuts_build_into_apps_with_icons(tmp_path):
     for app in made:
         icon = app / "Contents" / "Resources" / "applet.icns"
         assert icon.exists() and icon.stat().st_size > 10_000
+        assert not (app / "Contents" / "Resources" / "Assets.car").exists()  # it would win over our icon
     assert len(desktop.uninstall(tmp_path)) == 3 and not list(tmp_path.iterdir())
