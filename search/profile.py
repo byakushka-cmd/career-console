@@ -119,7 +119,8 @@ REGIONS = {
     "sharon": ("Sharon & Hadera", [
         "raanana", "ra'anana", "רעננה", "kfar saba", "כפר סבא", "hod hasharon", "הוד השרון", "netanya", "נתניה",
         "herzliya", "הרצליה", "ramat hasharon", "even yehuda", "kadima", "caesarea", "קיסריה", "hadera", "חדרה",
-        "or akiva", "hasharon", "השרון", "sharon"]),
+        "or akiva", "hasharon", "השרון", "sharon", "bnei dror", "bney dror", "emek hefer", "עמק חפר", "kfar yona",
+        "כפר יונה"]),
     "center": ("Center & Shfela", [
         "center district", "central district", "petah tikva", "petach tikva", "petah-tikva", "petah tiqwa", "פתח תקווה",
         "rosh haayin", "rosh ha'ayin", "ראש העין", "airport city", "lod", "לוד", "ramla", "רמלה", "rehovot", "רחובות",
@@ -139,8 +140,14 @@ REGIONS = {
         "north district", "northern district", "haifa district", "haifa", "חיפה", "yokneam", "יקנעם", "migdal haemek",
         "מגדל העמק", "nazareth", "נצרת", "karmiel", "כרמיאל", "tirat carmel", "nesher", "kiryat shmona", "tiberias",
         "טבריה", "kinneret", "כנרת", "afula", "עפולה", "galilee", "גליל", "matam", "manof", "beit shean", "בית שאן",
-        "צפון"]),
+        "צפון", "kiryat ata", "קריית אתא", "kiryat bialik", "kiryat motzkin", "kiryat yam", "nahariya", "נהריה", "akko",
+        "עכו", "misgav", "משגב"]),
 }
+# Every town of a region is in Israel, also when ISRAEL_TERMS does not list it ("Yehud Monosson", "Beer Yaakov").
+# District names and words used elsewhere stay out: Hong Kong has a "Central District".
+_NOT_ONLY_IN_ISRAEL = {"center district", "central district", "south district", "southern district", "north district",
+                       "northern district", "sharon", "ariel", "eli"}
+REGION_TOWNS = [p for _, places in REGIONS.values() for p in places if p not in _NOT_ONLY_IN_ISRAEL]
 
 ISRAEL_COUNTRY_CODES = {"IL", "ISR"}
 WORLDWIDE_TERMS = ["worldwide", "anywhere", "global", "work from anywhere", "any location", "all locations"]
@@ -327,7 +334,7 @@ def geography(location: str, countries: list[str] | None = None, remote: bool | 
     codes = {c.upper() for c in (countries or []) if c}
     if (m := ISO3_PREFIX.match(location or "")) and m.group(1) in ISO3_TO_ISO2:
         codes.add(ISO3_TO_ISO2[m.group(1)])
-    hits = find_terms(loc, ISRAEL_TERMS)
+    hits = find_terms(loc, ISRAEL_TERMS) or find_terms(loc, REGION_TOWNS)
     if hits or codes & ISRAEL_COUNTRY_CODES:
         return Verdict("ISRAEL", f"location: {hits[0] if hits else 'country ' + sorted(codes & ISRAEL_COUNTRY_CODES)[0]}")
     if codes:

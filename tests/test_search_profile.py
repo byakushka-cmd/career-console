@@ -39,6 +39,14 @@ def test_israeli_tech_hubs_are_israel():
         assert geography(loc).value == "ISRAEL", loc   # Island's "Test Development Engineer - Glilot"
 
 
+def test_towns_of_every_region_are_israel():
+    # LinkedIn alerts write the town only; these were "location unclear" and kept a Head of QA off the list
+    for loc in ("Yehud Monosson", "Beer Yaakov", "Bney Dror", "Kiryat Ata", "Emek Hefer Regional Council",
+                "Kinneret Kvutza", "קריית אונו", "בת ים"):
+        assert geography(loc).value == "ISRAEL", loc
+    assert geography("Central District, Hong Kong").value == "OUTSIDE"
+
+
 def test_geo_verdicts_always_explain_themselves():
     for loc in ("Haifa", "Berlin", "Remote", "Remote - Worldwide"):
         assert geography(loc).reason
@@ -208,7 +216,8 @@ def test_hebrew_gender_forms_still_match_search_terms():
 
 
 @pytest.mark.parametrize("location, regions", [
-    ("Kinneret", {"north"}), ("Haifa District, Israel", {"north"}), ("Caesarea, Haifa District, Israel", {"sharon", "north"}),
+    ("Kinneret", {"north"}), ("Kiryat Ata", {"north"}), ("Bney Dror", {"sharon"}), ("Yehud Monosson", {"center"}),
+    ("Haifa District, Israel", {"north"}), ("Caesarea, Haifa District, Israel", {"sharon", "north"}),
     ("Center District, Israel", {"center"}), ("Tel Aviv-Yafo", {"tel_aviv"}), ("Herzliya", {"tel_aviv", "sharon"}),
     ("ירושלים", {"jerusalem"}), ("Israel", set()), ("Israel (3 locations)", set()), ("Remote", set()),
 ])
