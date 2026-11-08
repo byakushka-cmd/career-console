@@ -59,7 +59,7 @@ def test_geo_verdicts_always_explain_themselves():
     ("בודק/ת תוכנה", "MATCH", []),
     ("Тестировщик", "MATCH", []),
     ("Junior Manual QA", "MATCH", ["junior", "manual"]),          # low priority, never hidden for it
-    ("Embedded Software QA Engineer", "EXCLUDED", []),
+    ("Hardware QA Engineer", "EXCLUDED", []),
     ("Firmware Validation & Test Engineer", "EXCLUDED", []),
     ("Design Verification Engineer", "EXCLUDED", []),
     ("Quality Control Inspector", "EXCLUDED", []),
@@ -208,6 +208,18 @@ def test_likely_overqualified_reads_the_years_asked(text, expected):
 ])
 def test_level_reads_hebrew_gender_forms_and_leadership(title, expected):
     assert level(title, DEFAULT_PROFILE) == expected
+
+
+@pytest.mark.parametrize("title, expected", [
+    ("Embedded QA Engineer", "MATCH"),
+    ("מהנדס/ת בדיקות תוכנה Embedded", "MATCH"),
+    ("Embedded Software Test Engineer", "MATCH"),
+    ("Embedded Automation Engineer", "EXCLUDED"),           # not clearly QA
+    ("Embedded Hardware Test Engineer", "EXCLUDED"),        # another excluded word next to it
+    ("Firmware QA Engineer", "EXCLUDED"),
+])
+def test_embedded_is_excluded_only_when_the_title_is_not_qa(title, expected):
+    assert relevance(title, DEFAULT_PROFILE)[0].value == expected
 
 
 def test_hebrew_gender_forms_still_match_search_terms():

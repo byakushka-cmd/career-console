@@ -81,7 +81,7 @@ DEFAULT_PROFILE = {
 # visible on the board, and each rule can be turned off). Your own decisions and boards you turned off are not
 # here: they are your choices, undone where you made them.
 FILTERS = {  # key: (name on the board, what it holds back, short mark on a job it let through when off)
-    "title": ("Excluded word in the title", "a search term, but also hardware, embedded, QC, manufacturing… "
+    "title": ("Excluded word in the title", "a search term, but also hardware, firmware, QC, manufacturing… "
                                             "(Search settings → Exclude)", "excluded title word"),
     "description": ("Regulated or manufacturing description", "2+ medical-device or manufacturing-quality terms in "
                                                               "the description; software titles are never held back",
@@ -223,6 +223,8 @@ class Verdict:
 def relevance(title: str, profile: dict, description: str = "") -> tuple[Verdict, list[str], list[str], list[str]]:
     """(verdict, matched search terms, low-priority terms, description mentions below the exclusion threshold)."""
     excluded = find_terms(title, profile["exclude_terms"])
+    if excluded and {t.casefold() for t in excluded} <= EXCLUDED_UNLESS_QA and find_terms(title, QA_TITLE_TERMS):
+        excluded = []
     included = find_terms(title, profile["include_terms"])
     low = find_terms(title, profile.get("low_priority_terms", []))
     if excluded:
@@ -286,6 +288,12 @@ def asks_junior_years(description: str | None) -> bool:
 
 
 NARROW_TERMS = {"quality", "verification", "validation"}  # alone in a title they are often hardware or physics
+
+# Excluded words that do not exclude a title which is clearly QA: "Embedded QA Engineer", "בודק/ת תוכנה Embedded".
+# Next to another excluded word ("Embedded Hardware Test Engineer") the title stays excluded.
+EXCLUDED_UNLESS_QA = {"embedded"}
+QA_TITLE_TERMS = ["qa", "quality assurance", "test", "tester", "testing", "sdet", "בודק", "בודקת", "בדיקות",
+                  "אבטחת איכות", "тестировщик", "тестирование"]
 
 
 # "מוביל/ה טכנולוגי/ת QA" is a lead; "בודק/ת תוכנה לארגון ממשלתי מוביל" is a tester at a leading organization

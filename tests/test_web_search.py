@@ -127,7 +127,7 @@ def test_run_detail_explains_every_posting(client):
     run_id = re.search(r'href="/diagnostics/runs/(\d+)"', diag).group(1)
     page = client.get(f"/diagnostics/runs/{run_id}").text
     for text in ("Boards checked", "Needs geo review", "Hidden: outside Israel", "Already in your tracker",
-                 "Hidden: excluded terms", "new york", "embedded", "$0.00"):
+                 "Hidden: excluded terms", "new york", "firmware", "$0.00"):
         assert text in page
     assert client.get("/diagnostics/runs/999").status_code == 404
 
@@ -286,15 +286,15 @@ def test_filters_panel_shows_each_rule_and_turns_one_off(client):
     html = client.get("/opportunities").text
     assert 'id="filters"' in html and "all 8 on" in html
     assert "Excluded word in the title" in html and "Older than 14 days" in html and "Boards you turned off" in html
-    assert "Embedded QA Engineer" not in html
+    assert "Firmware QA Engineer" not in html
     r = client.post("/opportunities/filters", headers=SAME, follow_redirects=False, data={"filter": "title", "state": "off"})
     assert r.status_code == 303 and r.headers["location"] == "/opportunities?tab=verified&filters=open#filters"
     html = client.get("/opportunities").text
-    assert "1 off" in html and "Embedded QA Engineer" in html and "filter off: excluded title word" in html
+    assert "1 off" in html and "Firmware QA Engineer" in html and "filter off: excluded title word" in html
     assert "1 let in" in html and "Turn on" in html
     # saving Search settings keeps the board filters as they are
     client.post("/opportunities/settings/profile", headers=SAME,
-                data={"include_terms": "qa\nquality", "exclude_terms": "embedded", "low_priority_terms": "",
+                data={"include_terms": "qa\nquality", "exclude_terms": "firmware", "low_priority_terms": "",
                       "fresh_days": "7", "max_age_days": "14"})
     assert "filter off: excluded title word" in client.get("/opportunities").text
     assert client.post("/opportunities/filters", headers=SAME, data={"filter": "salary", "state": "off"}).status_code == 400

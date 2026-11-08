@@ -24,7 +24,7 @@ GREENHOUSE = {"jobs": [
     gh(222, "Senior QA Engineer, Payments", "Tel Aviv-Yafo, Israel"),                      # new, fresh
     gh(333, "QA Lead", "New York, NY"),                                                     # outside Israel
     gh(444, "SDET", "Remote"),                                                              # unknown geography
-    gh(555, "Embedded QA Engineer", "Haifa, Israel"),                                       # excluded by rules
+    gh(555, "Firmware QA Engineer", "Haifa, Israel"),                                       # excluded by rules
     gh(666, "Backend Engineer", "Tel Aviv"),                                                # not a QA role
     gh(777, "Quality Engineer", "Herzliya, Israel", published="2026-07-01T00:00:00Z"),      # older than 2 weeks: kept
     gh(888, "Senior Quality Specialist", "Tel Aviv, Israel",                                # regulatory, per description
@@ -108,7 +108,7 @@ def test_every_candidate_path_is_logged_with_reasons(conn):
     reasons = {conn.execute("SELECT title FROM postings WHERE id=?", (pid,)).fetchone()[0]: json.loads(r["reasons_json"])
                for pid, r in by_title.items()}
     assert "new york" in reasons["QA Lead"]["geo"]
-    assert "embedded" in reasons["Embedded QA Engineer"]["relevance"]
+    assert "firmware" in reasons["Firmware QA Engineer"]["relevance"]
     assert "none of the search terms" in reasons["Backend Engineer"]["relevance"]
     assert "manufacturing-quality terms: fda, mdr" in reasons["Senior Quality Specialist"]["relevance"]
 
@@ -472,15 +472,15 @@ def test_board_filters_hold_relevant_jobs_back_and_each_can_be_turned_off(conn):
     held = views["filter_counts"]   # live jobs each rule alone holds back
     assert held["title"] == 1 and held["description"] == 1 and held["older"] == 1
     assert held["outside"] == 1 and held["geo_unclear"] == 1 and held["known"] >= 1
-    assert "Embedded QA Engineer" not in titles(views["verified"])
+    assert "Firmware QA Engineer" not in titles(views["verified"])
     pipeline.set_filter(conn, "title", on=False)
     views = pipeline.opportunities(conn, NOW)
-    embedded = next(v for v in views["verified"] if v.posting["title"] == "Embedded QA Engineer")
+    embedded = next(v for v in views["verified"] if v.posting["title"] == "Firmware QA Engineer")
     assert embedded.ev.let_through == ["title"] and views["filter_counts"]["title"] == 1   # now: let in
     assert views["verified"][-1] is embedded                       # after the jobs every filter lets through
     assert pipeline.current_profile(conn)[1]["filters_off"] == ["title"]
     pipeline.set_filter(conn, "title", on=True)
-    assert "Embedded QA Engineer" not in titles(pipeline.opportunities(conn, NOW)["verified"])
+    assert "Firmware QA Engineer" not in titles(pipeline.opportunities(conn, NOW)["verified"])
 
 
 def test_a_job_held_back_by_two_filters_needs_both_off(conn):
