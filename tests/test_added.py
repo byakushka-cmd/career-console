@@ -126,7 +126,7 @@ def test_not_applied_jobs_have_the_links_and_buttons_of_new_jobs(client):
     page, record = not_applied(client)
     assert "linkedin.com/jobs/view/4470000001" in page
     assert "Find on Vandelay Robotics" in page
-    for button in ("Applied", "Already applied", "Not a fit", "Keep on hold", "Hide", "CV for this job"):
+    for button in ("Applied", "Already applied", "Not a fit", "Keep on hold", "Job closed", "CV for this job"):
         assert button in page
     assert f'action="/records/{record}/status"' in page
 

@@ -100,7 +100,7 @@
     <button class="btn" type="submit" name="state" value="DUPLICATE" title="You applied to this job before: not again">Already applied</button>
     <button class="btn" type="submit" name="state" value="SKIPPED" title="The job does not suit you">Not a fit</button>
     <button class="btn" type="submit" name="state" value="HOLD" title="Not now: keep it on hold">Keep on hold</button>
-    <button class="btn quiet" type="submit" name="state" value="CLOSED" title="The job is gone, or no longer of interest">Hide</button>
+    <button class="btn quiet" type="submit" name="state" value="CLOSED" title="The job is closed: removed, filled or no longer taking applications">Job closed</button>
     <a class="btn quiet" href="{{ r.href }}#cv">CV for this job</a>
     <input class="note-input" type="text" name="note" maxlength="2000" placeholder="Note (optional)" aria-label="Note" dir="auto">
   </form>
@@ -509,7 +509,7 @@
       <label class="field">Note <small>optional · write it first, it is saved with the status you press above</small>
         <textarea class="note-input" name="note" rows="1" maxlength="2000" placeholder="Why, in a few words" dir="auto"></textarea></label>
     </form>
-    <p class="fine"><b>In process</b>: you are in contact with them. <b>Rejected by them</b>: they said no after you applied. <b>Not a fit</b>: you decided not to go on (skip). <b>Gone / stale</b>: the job is gone or no longer takes applications. <b>Duplicate</b>: the same job as another of your records.</p>
+    <p class="fine"><b>In process</b>: you are in contact with them. <b>Rejected by them</b>: they said no after you applied. <b>Not a fit</b>: you decided not to go on (skip). <b>Job closed</b>: the job is removed, filled or no longer takes applications. <b>Duplicate</b>: the same job as another of your records.</p>
     {% if status_history %}
     <ol class="ritem-history">
       {% for e in status_history %}<li><span class="mono mut">{{ e.created_at_utc|local_time }}</span> {{ status_choices.get(e.decision, 'Back to tracker reading') }}{% if e.note %} — <span dir="auto">{{ e.note }}</span>{% endif %}</li>{% endfor %}

@@ -18,7 +18,7 @@ SUBJECT = "legacy_row"
 CONSOLE_SUBJECT = "console_application"
 # Order = order of the buttons on a record page.
 STATUS_CHOICES = {
-    "CLOSED": "Gone / stale",
+    "CLOSED": "Job closed",
     "SKIPPED": "Not a fit (my decision)",
     "APPLIED": "Applied",
     "IN_PROCESS": "In process",

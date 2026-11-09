@@ -203,7 +203,7 @@ def test_updating_a_tracker_status_moves_it_and_keeps_the_original(client):
     assert location.startswith(f"{back}&updated={rid}&prev=TRACKER#")
     assert "MT 9" not in refs(client.get(back).text)        # left "On hold"
     page = client.get(location).text
-    assert "Undo" in page and "Gone / stale" in page
+    assert "Undo" in page and "Job closed" in page
     detail = client.get(f"/records/{rid}").text
     assert "set by you" in detail and "404 on the official site" in detail
     assert "HOLD — not listed on official employer careers; NOT APPLIED" in detail   # tracker text unchanged
